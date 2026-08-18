@@ -1,0 +1,8 @@
+name = "metrx-web"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-12-30"
+
+# Build-time env vars are read by Vite, so set them in the Pages project settings
+# (or a local .env) rather than here:
+#   VITE_METRX_CORE_ADDRESS, VITE_API_BASE_URL, VITE_BOT_RPC_URL,
+#   VITE_AI_VERIFIER_ADDRESS, VITE_GITHUB_URL, VITE_DEMO_VIDEO_URL
