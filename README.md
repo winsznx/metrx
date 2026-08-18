@@ -54,7 +54,7 @@ scripts/            Seam check, key generation, mainnet proof runs, claim ledger
 ## Quick start
 
 ```bash
-git clone --recurse-submodules <repo-url> metrx && cd metrx
+git clone --recurse-submodules https://github.com/winsznx/metrx && cd metrx
 pnpm install
 pnpm keys:generate      # writes DEPLOYER / AI_VERIFIER / DEMO_OPERATOR keys to .env
 pnpm seam:check         # live BOT Chain assumptions -> SEAM_REPORT.md
