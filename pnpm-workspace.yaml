@@ -1,0 +1,15 @@
+packages:
+  - "apps/*"
+  - "workers/*"
+  - "packages/*"
+
+# Native postinstall scripts. The three disabled entries are optional accelerators
+# pulled in transitively by wagmi's connector tree; Metrx only ships the injected
+# connector, so none of them reach the browser bundle.
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
+  bufferutil: false
+  keccak: false
+  utf-8-validate: false

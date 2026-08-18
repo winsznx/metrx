@@ -1,0 +1,29 @@
+{
+  "name": "metrx",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AI-native compute settlement on BOT Chain Mainnet",
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "keys:generate": "node scripts/generate-keys.mjs",
+    "seam:check": "node scripts/seam-check.mjs",
+    "abi:sync": "node scripts/sync-abi.mjs",
+    "contracts:build": "cd contracts && forge build",
+    "contracts:test": "cd contracts && forge test -vv",
+    "contracts:deploy": "cd contracts && forge script script/Deploy.s.sol:Deploy --rpc-url $BOT_RPC_URL --broadcast --legacy --private-key $DEPLOYER_PRIVATE_KEY",
+    "contracts:verify": "node scripts/verify-contract.mjs",
+    "proof:run": "node scripts/mainnet-proof.mjs",
+    "claim:verify": "node scripts/verify-claim-ledger.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.7.2",
+    "viem": "^2.21.55",
+    "dotenv": "^16.4.7"
+  }
+}

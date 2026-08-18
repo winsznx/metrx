@@ -1,0 +1,14 @@
+internal/
+.env
+.env.*
+!.env.example
+broadcast/
+cache/
+out/
+node_modules/
+dist/
+.wrangler/
+.turbo/
+*.log
+.DS_Store
+deployments/*.local.json
