@@ -1,0 +1,24 @@
+{
+  "name": "@metrx/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@metrx/shared": "workspace:*",
+    "hono": "^4.6.14",
+    "viem": "^2.21.55"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241224.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^3.99.0",
+    "vitest": "^2.1.8"
+  }
+}

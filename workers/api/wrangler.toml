@@ -1,0 +1,30 @@
+name = "metrx-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-30"
+compatibility_flags = ["nodejs_compat"]
+
+# Public, non-secret configuration. Secrets are set with `wrangler secret put`:
+#   AI_VERIFIER_PRIVATE_KEY, ANTHROPIC_API_KEY / OPENAI_API_KEY / CLOUDFLARE_API_TOKEN
+[vars]
+BOT_RPC_URL = "https://rpc.botchain.ai"
+BOT_CHAIN_ID = "677"
+METRX_CORE_ADDRESS = "0x868ee03536A046DcFa568BbaE29C1C3a9f85B018"
+# The verifier model. `openai/gpt-oss-120b` on Groq supports strict json_schema structured
+# outputs, so the verdict schema is enforced by the model rather than repaired afterwards.
+# Requires `wrangler secret put GROQ_API_KEY`. Set AI_PROVIDER="mock" to run the offline
+# deterministic stand-in instead; every mocked verdict is tagged as such end to end.
+AI_PROVIDER = "groq"
+AI_MODEL_ID = "openai/gpt-oss-120b"
+ALLOWED_ORIGIN = "*"
+
+# Artifact storage. KV is the primary store; R2 is used instead when bound.
+[[kv_namespaces]]
+binding = "ARTIFACTS"
+id = "63d79e0a391d4e57b075872b5793fce5"
+
+# [[r2_buckets]]
+# binding = "ARTIFACTS_R2"
+# bucket_name = "metrx-artifacts"
+
+[observability]
+enabled = true
