@@ -1,0 +1,8 @@
+{
+  "chainId": 677,
+  "metrxCore": "0x868ee03536A046DcFa568BbaE29C1C3a9f85B018",
+  "aiVerifier": "0x10053A1406C7024Fd237fe4192BC15A0Bc018C8d",
+  "domainSeparator": "0x97f9f26381327d44ffd88768b559689d8ccee0a37280f85cd96786eb0ae67236",
+  "deployedAtBlock": 19930429,
+  "deployTxHash": "0x3eaf5811797a8b739e2897175fa4937c3de0df722370e5eede82dd7068f1b196"
+}

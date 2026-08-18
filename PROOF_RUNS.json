@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-08-17T01:56:56.389Z",
+  "chainId": 677,
+  "contract": "0x868ee03536A046DcFa568BbaE29C1C3a9f85B018",
+  "buyer": "0x6bf5265BbfB6AE51e1E3f91c1A1165767CA1c135",
+  "operator": "0x0f4c664E14231C4B56B0DF84e458A70D3d24624e",
+  "setup": {},
+  "runs": [
+    {
+      "kind": "FAIL",
+      "orderId": "2",
+      "status": "Slashed",
+      "price": "0.01",
+      "maxSlash": "0.005",
+      "scoreBps": 0,
+      "provider": "groq",
+      "modelId": "openai/gpt-oss-120b",
+      "mocked": false,
+      "verifierAddress": "0x10053A1406C7024Fd237fe4192BC15A0Bc018C8d",
+      "reasonHash": "0xf8c64493bbb18f97f8a97f34563ebd88b15bcc96b39614e7d83e8a5291ace489",
+      "txs": {
+        "createOrder": "0x3873d4e2a34a2dbdf3db9dcfbf27da5abd9fee8b6c454541de5f19dab8abf269",
+        "acceptOrder": "0xb8ed94feb351193f8b45f76558a1279fb01d13313ebfd4ca80ec3fcf8549eaf9",
+        "submitDelivery": "0xc1dc67354758a64cccc1d917d7862f173cc1748a9b0c21e4e0aa084b52bfb821",
+        "settle": "0x540d789e2018f1226773579224f88fa591c67ba95c9fba152dcfbfbbb7a6405b"
+      },
+      "proofUrl": "/proof/2",
+      "explorer": {
+        "createOrder": "https://scan.botchain.ai/tx/0x3873d4e2a34a2dbdf3db9dcfbf27da5abd9fee8b6c454541de5f19dab8abf269",
+        "acceptOrder": "https://scan.botchain.ai/tx/0xb8ed94feb351193f8b45f76558a1279fb01d13313ebfd4ca80ec3fcf8549eaf9",
+        "submitDelivery": "https://scan.botchain.ai/tx/0xc1dc67354758a64cccc1d917d7862f173cc1748a9b0c21e4e0aa084b52bfb821",
+        "settle": "https://scan.botchain.ai/tx/0x540d789e2018f1226773579224f88fa591c67ba95c9fba152dcfbfbbb7a6405b"
+      }
+    },
+    {
+      "kind": "PASS",
+      "orderId": "1",
+      "status": "Paid",
+      "price": "0.01",
+      "maxSlash": "0.005",
+      "scoreBps": 10000,
+      "provider": "groq",
+      "modelId": "openai/gpt-oss-120b",
+      "mocked": false,
+      "verifierAddress": "0x10053A1406C7024Fd237fe4192BC15A0Bc018C8d",
+      "reasonHash": "0x9db286ae172afcaa556d4c7c65bd7b0408f78ca08fbb9f0c084bc5f5ece5e82f",
+      "txs": {
+        "createOrder": "0x18e1173fff2e4f50195b7d88423b54cf7745e0934b17dcc99e2f6f799c888143",
+        "acceptOrder": "0xbc678dafe2e0d3f11c51b14beeb681aa81261828511b43b33d889a4486ba5c21",
+        "submitDelivery": "0x042e0c95290c90b97f2032ed4b93eb439af20b96c34670d4d6ad3a6d20644274",
+        "settle": "0xc4ed4b8476ecd5d82d28a2bd63092e0d66514fde51355fb9780484caf6b4afd9"
+      },
+      "proofUrl": "/proof/1",
+      "explorer": {
+        "createOrder": "https://scan.botchain.ai/tx/0x18e1173fff2e4f50195b7d88423b54cf7745e0934b17dcc99e2f6f799c888143",
+        "acceptOrder": "https://scan.botchain.ai/tx/0xbc678dafe2e0d3f11c51b14beeb681aa81261828511b43b33d889a4486ba5c21",
+        "submitDelivery": "https://scan.botchain.ai/tx/0x042e0c95290c90b97f2032ed4b93eb439af20b96c34670d4d6ad3a6d20644274",
+        "settle": "https://scan.botchain.ai/tx/0xc4ed4b8476ecd5d82d28a2bd63092e0d66514fde51355fb9780484caf6b4afd9"
+      }
+    }
+  ]
+}
