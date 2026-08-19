@@ -8,9 +8,11 @@ import Create from "@/routes/Create";
 import Orders from "@/routes/Orders";
 import OrderDetail from "@/routes/OrderDetail";
 import Operator from "@/routes/Operator";
+import Onboarding from "@/routes/Onboarding";
+import Settings from "@/routes/Settings";
 import Verify from "@/routes/Verify";
 import {ProofDetail, ProofHub} from "@/routes/Proof";
-import {Security, WhatIsReal} from "@/routes/Docs";
+import {Architecture, Security, WhatIsReal} from "@/routes/Docs";
 
 function ScrollToTop() {
   const {pathname} = useLocation();
@@ -25,6 +27,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/app" element={<Dashboard />} />
+        <Route path="/app/onboarding" element={<Onboarding />} />
+        <Route path="/app/settings" element={<Settings />} />
         <Route path="/app/create" element={<Create />} />
         <Route path="/app/orders" element={<Orders />} />
         <Route path="/app/orders/:id" element={<OrderDetail />} />
@@ -34,6 +38,7 @@ export default function App() {
         <Route path="/proof/:id" element={<ProofDetail />} />
         <Route path="/docs/what-is-real" element={<WhatIsReal />} />
         <Route path="/docs/security" element={<Security />} />
+        <Route path="/docs/architecture" element={<Architecture />} />
         <Route
           path="*"
           element={

@@ -68,6 +68,7 @@ export function Footer() {
             {label: "Proof", to: "/proof"},
             {label: "Security", to: "/docs/security"},
             {label: "What is real", to: "/docs/what-is-real"},
+            {label: "Get started", to: "/app/onboarding"},
           ]}
         />
         <FooterColumn
@@ -78,7 +79,8 @@ export function Footer() {
               label: "Contract",
               href: CORE_ADDRESS ? explorerAddress(CORE_ADDRESS) : "https://scan.botchain.ai",
             },
-            {label: "Claim ledger", to: "/docs/what-is-real#claims"},
+            ...(GITHUB_URL ? [{label: "Claim ledger", href: `${GITHUB_URL}/blob/main/CLAIM_LEDGER.md`}] : []),
+            {label: "Architecture", to: "/docs/architecture"},
           ]}
         />
         <FooterColumn

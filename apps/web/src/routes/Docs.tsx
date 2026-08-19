@@ -252,3 +252,95 @@ export function Security() {
     </Section>
   );
 }
+
+// ---------------------------------------------------------------------------
+
+export function Architecture() {
+  return (
+    <Section className="py-14" width="narrow">
+      <Eyebrow>Docs</Eyebrow>
+      <h1 className="headline mt-2 text-[38px]">How Metrx is put together</h1>
+      <p className="mt-4 text-[17px] leading-relaxed text-slate">
+        Four moving parts and exactly one trusted party.
+      </p>
+
+      <H2>The pieces</H2>
+      <Prose>
+        <ul className="list-disc space-y-2 pl-5">
+          <li>
+            <span className="text-ink">MetrxCore</span> on BOT Chain Mainnet holds the buyer's escrow and the operator's
+            stake in native BOT, and releases them only against a signed verdict.
+          </li>
+          <li>
+            <span className="text-ink">The AI verifier</span> runs as a Cloudflare Worker. It reads the order from
+            chain, refuses to judge unless the published artifacts reproduce their on-chain hashes, runs the model, and
+            signs an EIP-712 certificate. It never holds funds and never broadcasts a transaction.
+          </li>
+          <li>
+            <span className="text-ink">The artifact store</span> is content-addressed by the exact hash the contract
+            stores, so a fetched artifact either reproduces its key or it is rejected.
+          </li>
+          <li>
+            <span className="text-ink">This app</span> reads the chain directly and signs every write in your own
+            wallet. There is no backend account and no custody.
+          </li>
+        </ul>
+      </Prose>
+
+      <H2>The order lifecycle</H2>
+      <Prose>
+        <p className="mono text-[13px] leading-relaxed">
+          Funded → Accepted → Delivered → Paid (PASS)
+          <br />
+          Funded → Accepted → Delivered → Slashed (FAIL)
+          <br />
+          Funded → Accepted → Slashed (nothing delivered by the deadline)
+          <br />
+          Funded → Refunded (nobody accepted before the deadline)
+          <br />
+          Delivered → Refunded (no verdict before the verification deadline)
+          <br />
+          Funded → Cancelled (buyer pulled out before an operator committed)
+        </p>
+        <p>
+          Every terminal state assigns the full escrow to exactly one party. The delivery and verification windows do
+          not overlap, so a late certificate can never race a timeout refund.
+        </p>
+      </Prose>
+
+      <H2>What is committed, and when</H2>
+      <Prose>
+        <p>
+          At creation the buyer commits the job spec, the input, the rubric and the verifier model. At delivery the
+          operator commits the output. Only then does the verifier see anything. That ordering is what makes the verdict
+          auditable: the rules were fixed before the work, and the work was fixed before the judgement.
+        </p>
+        <p>
+          Each of those is a keccak256 hash of a canonical serialisation, and the same implementation runs in this
+          browser and in the verifier, so a spec hashed here reproduces byte for byte there.
+        </p>
+      </Prose>
+
+      <H2>Why there is no database</H2>
+      <Prose>
+        <p>
+          Order state, stake and outcomes all live in the contract. Artifacts are the only off-chain data and they are
+          content-addressed. A second source of truth could disagree with the chain, which is the exact failure Metrx
+          exists to remove.
+        </p>
+      </Prose>
+
+      <div className="mt-12">
+        <Card className="p-6">
+          <p className="text-sm text-slate">
+            Diagrams, the full state machine and the threat model live in ARCHITECTURE.md and{" "}
+            <Link className="text-ink underline underline-offset-2" to="/docs/security">
+              Security
+            </Link>
+            .
+          </p>
+        </Card>
+      </div>
+    </Section>
+  );
+}
