@@ -228,6 +228,38 @@ contract MetrxCoreTest is Test {
         assertEq(operator.balance, before + STAKE - MAX_SLASH);
     }
 
+    function test_operatorCanStopAndResumeTakingWork() public {
+        _registerOperator();
+        uint256 first = _createOrder();
+
+        vm.prank(operator);
+        core.setOperatorActive(false);
+        assertFalse(core.getOperator(operator).active);
+
+        vm.prank(operator);
+        vm.expectRevert(MetrxCore.NotRegistered.selector);
+        core.acceptOrder(first);
+
+        // Winding down must not touch stake that is already committed elsewhere.
+        vm.prank(operator);
+        core.setOperatorActive(true);
+        vm.prank(operator);
+        core.acceptOrder(first);
+        assertEq(core.getOperator(operator).lockedStake, MAX_SLASH);
+
+        vm.prank(operator);
+        core.setOperatorActive(false);
+        vm.prank(operator);
+        core.submitDelivery(first, OUTPUT, ARTIFACT);
+        assertEq(uint8(core.getOrder(first).status), uint8(MetrxCore.OrderStatus.Delivered));
+    }
+
+    function test_setOperatorActiveRequiresRegistration() public {
+        vm.prank(stranger);
+        vm.expectRevert(MetrxCore.NotRegistered.selector);
+        core.setOperatorActive(false);
+    }
+
     function test_operatorCannotAcceptWithoutEnoughUnlockedStake() public {
         vm.prank(operator);
         core.registerOperator{value: MAX_SLASH - 1}("x");

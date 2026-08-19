@@ -119,6 +119,7 @@ contract MetrxCore {
     // -----------------------------------------------------------------------
 
     event OperatorRegistered(address indexed operator, uint256 stake, string metadataURI);
+    event OperatorActiveSet(address indexed operator, bool active);
     event OperatorMetadataUpdated(address indexed operator, string metadataURI);
     event StakeAdded(address indexed operator, uint256 amount);
     event StakeWithdrawn(address indexed operator, uint256 amount);
@@ -226,6 +227,16 @@ contract MetrxCore {
         op.stake -= amount;
         emit StakeWithdrawn(msg.sender, amount);
         _payout(msg.sender, amount);
+    }
+
+    /// @notice Stop or resume accepting new orders.
+    /// @dev The operator exit path. Deactivating blocks `acceptOrder` but leaves live orders and
+    ///      already-locked stake untouched, so an operator can wind down without abandoning work.
+    function setOperatorActive(bool active) external {
+        Operator storage op = _operators[msg.sender];
+        if (op.owner == address(0)) revert NotRegistered();
+        op.active = active;
+        emit OperatorActiveSet(msg.sender, active);
     }
 
     /// @notice Update the operator's public metadata pointer (name, endpoint, capabilities).
