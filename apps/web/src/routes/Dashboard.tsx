@@ -4,8 +4,9 @@ import {useMemo} from "react";
 import {availableStake, type Order} from "@metrx/shared";
 import {isRegistered, useBotBalance, useOperator, useOrders, useNow} from "@/lib/contract";
 import {botAmount} from "@/lib/format";
-import {Card, EmptyState, Eyebrow, Section, Spinner, Stat, StatusPill} from "@/components/primitives";
-import {ConnectButton, NetworkBanner, WalletSummary} from "@/components/Wallet";
+import {Card, EmptyState, Eyebrow, Notice, Section, Spinner, Stat, StatusPill} from "@/components/primitives";
+import type {FriendlyError} from "@/lib/errors";
+import {AccountChangeBanner, ConnectButton, NetworkBanner, WalletSummary} from "@/components/Wallet";
 import {DeployGate} from "@/components/DeployGate";
 
 export default function Dashboard() {
@@ -41,6 +42,7 @@ export default function Dashboard() {
       <div className="mt-8 space-y-4">
         <DeployGate>
           <NetworkBanner />
+          <AccountChangeBanner />
         </DeployGate>
       </div>
 
@@ -71,6 +73,23 @@ export default function Dashboard() {
             </Card>
           </div>
 
+          {mine.bought.length === 0 && mine.operated.length === 0 && !orders.loading && !orders.error && (
+            <div className="mt-4">
+              <Notice
+                tone="neutral"
+                title="New here?"
+                action={
+                  <Link to="/app/onboarding" className="btn btn-primary">
+                    Open the checklist
+                  </Link>
+                }
+              >
+                A five-step checklist walks you through buying or selling your first compute job, and checks each step
+                against your wallet as you go.
+              </Notice>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap gap-3">
             <Link to="/app/create" className="btn btn-primary">
               Create compute order
@@ -88,6 +107,8 @@ export default function Dashboard() {
               title="Needs your attention"
               empty="Nothing is waiting on you right now."
               loading={orders.loading}
+              error={orders.error}
+              onRetry={orders.reload}
               orders={[...mine.bought, ...mine.operated].filter((o) =>
                 ["Funded", "Accepted", "Delivered"].includes(o.status)
               )}
@@ -96,6 +117,8 @@ export default function Dashboard() {
               title="Open jobs on the network"
               empty="No funded orders are waiting for an operator."
               loading={orders.loading}
+              error={orders.error}
+              onRetry={orders.reload}
               orders={mine.open}
             />
           </div>
@@ -110,14 +133,14 @@ function RolePicker() {
     {
       title: "I buy compute",
       body: "Fund a bounded job in native BOT, publish the rubric it must satisfy, and let the AI verifier decide whether it gets paid.",
-      to: "/app/create",
-      cta: "Create an order",
+      to: "/app/onboarding?role=buyer",
+      cta: "Start as a buyer",
     },
     {
       title: "I operate compute",
       body: "Stake BOT, accept funded work, and get paid the full escrow the moment your output passes the buyer's rubric.",
-      to: "/app/operator",
-      cta: "Register as operator",
+      to: "/app/onboarding?role=operator",
+      cta: "Start as an operator",
     },
     {
       title: "I verify proof",
@@ -152,11 +175,15 @@ function OrderColumn({
   orders,
   empty,
   loading,
+  error,
+  onRetry,
 }: {
   title: string;
   orders: Order[];
   empty: string;
   loading: boolean;
+  error?: FriendlyError | null;
+  onRetry?: () => void;
 }) {
   const unique = Array.from(new Map(orders.map((o) => [o.id.toString(), o])).values());
   return (
@@ -165,6 +192,20 @@ function OrderColumn({
       <div className="mt-4 space-y-2">
         {loading ? (
           <Spinner label="Reading BOT Chain…" />
+        ) : error ? (
+          <Notice
+            tone="bad"
+            title="Could not read BOT Chain"
+            action={
+              onRetry ? (
+                <button type="button" className="btn btn-ghost" onClick={onRetry}>
+                  Try again
+                </button>
+              ) : undefined
+            }
+          >
+            {error.detail}
+          </Notice>
         ) : unique.length === 0 ? (
           <EmptyState title={empty} />
         ) : (

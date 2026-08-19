@@ -2,7 +2,7 @@ import {useEffect, useState} from "react";
 import {Link, useParams} from "react-router-dom";
 import {isTerminal, type DeliveryArtifact, type JobSpec} from "@metrx/shared";
 import {api, readArtifact, type SignedVerdictResponse, type VerifierConfig} from "@/lib/api";
-import {useMetrxWrite, useNetworkGate, useOrder} from "@/lib/contract";
+import {useMetrxWrite, useNetworkGate, useNow, useOrder} from "@/lib/contract";
 import {botAmount, scoreLabel, timestamp} from "@/lib/format";
 import {humanError, type FriendlyError} from "@/lib/errors";
 import {
@@ -30,6 +30,7 @@ export default function Verify() {
   const {isConnected} = useAccount();
   const {wrongNetwork} = useNetworkGate();
   const tx = useMetrxWrite();
+  const now = useNow();
 
   const [config, setConfig] = useState<VerifierConfig | null>(null);
   const [spec, setSpec] = useState<JobSpec | null>(null);
@@ -41,6 +42,12 @@ export default function Verify() {
   useEffect(() => {
     api.config().then(setConfig).catch(() => setConfig(null));
   }, []);
+
+  // Restore a certificate signed earlier, so losing the tab does not strand a delivered order.
+  useEffect(() => {
+    if (!orderId) return;
+    api.existingVerdict(orderId).then((v) => v && setVerdict((current) => current ?? v));
+  }, [orderId]);
 
   useEffect(() => {
     if (!order.data) return;
@@ -77,6 +84,7 @@ export default function Verify() {
   }
 
   const settled = !!order.data && isTerminal(order.data.status);
+  const windowClosed = !!order.data && now > Number(order.data.verificationDeadline);
 
   return (
     <Section className="py-14" width="narrow">
@@ -147,7 +155,45 @@ export default function Verify() {
         </div>
       )}
 
-      {order.data?.status === "Delivered" && (
+      {order.data?.status === "Delivered" && windowClosed && (
+        <div className="mt-8">
+          <Card className="flex flex-wrap items-center justify-between gap-4 p-6">
+            <div>
+              <p className="text-[15px] font-medium text-ink">The verification window closed</p>
+              <p className="mt-1 max-w-2xl text-sm text-slate">
+                No signed verdict landed in time, so the contract will no longer accept one. Anyone can close this
+                order: the buyer is refunded {botAmount(order.data.price)} and the operator's stake is released without
+                penalty.
+              </p>
+              {tx.phase === "pending" && tx.hash && (
+                <p className="mt-2 text-sm text-slate">
+                  Waiting for confirmation · <TxLink hash={tx.hash} />
+                </p>
+              )}
+              <div className="mt-3">
+                <ErrorNotice error={tx.error} />
+              </div>
+            </div>
+            {isConnected ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={tx.busy || wrongNetwork}
+                onClick={async () => {
+                  const hash = await tx.send("finalizeVerifierTimeout", [order.data!.id]);
+                  if (hash) order.reload();
+                }}
+              >
+                {tx.busy ? "Working…" : "Refund the buyer"}
+              </button>
+            ) : (
+              <ConnectButton />
+            )}
+          </Card>
+        </div>
+      )}
+
+      {order.data?.status === "Delivered" && !windowClosed && (
         <>
           <Card className="mt-8 p-7">
             <Eyebrow>What the verifier will read</Eyebrow>

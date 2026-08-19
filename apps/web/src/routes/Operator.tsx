@@ -1,9 +1,9 @@
-import {useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {Link} from "react-router-dom";
 import {useAccount} from "wagmi";
 import {availableStake, hashJson, hashText, type DeliveryArtifact, type Order} from "@metrx/shared";
 import {api} from "@/lib/api";
-import {isRegistered, useMetrxWrite, useNetworkGate, useNow, useOperator, useOrders} from "@/lib/contract";
+import {isRegistered, useBotBalance, useMetrxWrite, useNetworkGate, useNow, useOperator, useOrders} from "@/lib/contract";
 import {botAmount, relativeDeadline, safeParseBot} from "@/lib/format";
 import {humanError, type FriendlyError} from "@/lib/errors";
 import {
@@ -21,7 +21,9 @@ import {
   StatusPill,
   TxLink,
 } from "@/components/primitives";
-import {ConnectButton, NetworkBanner} from "@/components/Wallet";
+import {AccountChangeBanner, ConnectButton, NetworkBanner} from "@/components/Wallet";
+import {GetBot} from "@/components/GetBot";
+import {clearDraft, loadDraft, saveDraft} from "@/lib/drafts";
 import {DeployGate} from "@/components/DeployGate";
 
 export default function Operator() {
@@ -36,10 +38,17 @@ export default function Operator() {
     const lower = address?.toLowerCase();
     return {
       open: all.filter((o) => o.status === "Funded" && Number(o.deliveryDeadline) > now),
-      accepted: all.filter((o) => o.operator.toLowerCase() === lower && ["Accepted", "Delivered"].includes(o.status)),
+      accepted: all.filter(
+        (o) => o.operator.toLowerCase() === lower && ["Accepted", "Delivered"].includes(o.status)
+      ),
       history: all.filter((o) => o.operator.toLowerCase() === lower && ["Paid", "Slashed", "Refunded"].includes(o.status)),
     };
   }, [orders.data, address, now]);
+
+  const earned = useMemo(
+    () => history.filter((o) => o.status === "Paid").reduce((sum, o) => sum + o.price, 0n),
+    [history]
+  );
 
   return (
     <Section className="py-14">
@@ -51,6 +60,7 @@ export default function Operator() {
       <div className="mt-8 space-y-4">
         <DeployGate>
           <NetworkBanner />
+          <AccountChangeBanner />
           {!isConnected && (
             <Notice tone="neutral" title="Connect a wallet to register" action={<ConnectButton />}>
               Registration is a single transaction that posts your stake in native BOT.
@@ -66,7 +76,7 @@ export default function Operator() {
               <Spinner label="Reading your operator record…" />
             </div>
           ) : registered ? (
-            <StakePanel profile={operator.data!} onDone={operator.reload} />
+            <StakePanel profile={operator.data!} earned={earned} onDone={operator.reload} />
           ) : (
             <RegisterPanel onDone={operator.reload} />
           )}
@@ -139,9 +149,11 @@ export default function Operator() {
 function RegisterPanel({onDone}: {onDone: () => void}) {
   const tx = useMetrxWrite();
   const {wrongNetwork} = useNetworkGate();
+  const balance = useBotBalance();
   const [stake, setStake] = useState("0.05");
   const [metadata, setMetadata] = useState("");
   const parsed = safeParseBot(stake);
+  const short = parsed.wei !== null && balance !== null && balance < parsed.wei;
 
   const register = async () => {
     if (!parsed.wei) return;
@@ -176,21 +188,39 @@ function RegisterPanel({onDone}: {onDone: () => void}) {
 
       <div className="mt-6 space-y-3">
         <ErrorNotice error={tx.error} />
+        {short && <GetBot need="stake" />}
         {tx.phase === "pending" && tx.hash && (
           <p className="text-sm text-slate">
             Waiting for confirmation · <TxLink hash={tx.hash} />
           </p>
         )}
-        <button type="button" className="btn btn-primary" disabled={tx.busy || wrongNetwork || !parsed.wei} onClick={register}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={tx.busy || wrongNetwork || !parsed.wei || short}
+          onClick={register}
+        >
           {tx.busy ? "Working…" : `Register with ${botAmount(parsed.wei)}`}
         </button>
+        <p className="text-xs text-stone">
+          This wallet holds {botAmount(balance)}. You also pay gas in BOT.
+        </p>
       </div>
     </Card>
   );
 }
 
-function StakePanel({profile, onDone}: {profile: NonNullable<ReturnType<typeof useOperator>["data"]>; onDone: () => void}) {
+function StakePanel({
+  profile,
+  earned,
+  onDone,
+}: {
+  profile: NonNullable<ReturnType<typeof useOperator>["data"]>;
+  earned: bigint;
+  onDone: () => void;
+}) {
   const tx = useMetrxWrite();
+  const activeTx = useMetrxWrite();
   const {wrongNetwork} = useNetworkGate();
   const [amount, setAmount] = useState("0.01");
   const [mode, setMode] = useState<"add" | "withdraw">("add");
@@ -211,10 +241,33 @@ function StakePanel({profile, onDone}: {profile: NonNullable<ReturnType<typeof u
       <Card className="grid gap-6 p-7 sm:grid-cols-3">
         <Stat label="Total stake" value={botAmount(profile.stake)} />
         <Stat label="Locked" value={botAmount(profile.lockedStake)} sub="Committed to live orders" />
-        <Stat label="Slashed to date" value={botAmount(profile.slashed)} />
+        <Stat label="Earned to date" value={botAmount(earned)} sub={`${botAmount(profile.slashed)} slashed`} />
         <div className="sm:col-span-3">
           <Row label="Unlocked and withdrawable">{botAmount(unlocked)}</Row>
+          <Row label="Taking new work">
+            <span className="flex items-center gap-3">
+              {profile.active ? "Yes" : "Paused"}
+              <button
+                type="button"
+                className="btn btn-ghost px-3 py-1 text-[13px]"
+                disabled={activeTx.busy || wrongNetwork}
+                onClick={async () => {
+                  const hash = await activeTx.send("setOperatorActive", [!profile.active]);
+                  if (hash) onDone();
+                }}
+              >
+                {activeTx.busy ? "Working…" : profile.active ? "Stop taking work" : "Resume"}
+              </button>
+            </span>
+          </Row>
           {profile.metadataURI && <Row label="Metadata">{profile.metadataURI}</Row>}
+          <ErrorNotice error={activeTx.error} />
+          {!profile.active && (
+            <p className="mt-2 text-xs text-stone">
+              Paused only blocks new orders. Work you already accepted continues, and locked stake stays locked until
+              those orders settle.
+            </p>
+          )}
         </div>
       </Card>
 
@@ -245,6 +298,16 @@ function StakePanel({profile, onDone}: {profile: NonNullable<ReturnType<typeof u
         </div>
         <div className="mt-5 space-y-3">
           <ErrorNotice error={tx.error} />
+          {tx.phase === "pending" && tx.hash && (
+            <p className="text-sm text-slate">
+              Waiting for confirmation · <TxLink hash={tx.hash} />
+            </p>
+          )}
+          {tx.phase === "confirmed" && tx.hash && (
+            <p className="text-sm text-deep">
+              Confirmed · <TxLink hash={tx.hash} />
+            </p>
+          )}
           <button
             type="button"
             className="btn btn-primary w-full"
@@ -285,6 +348,11 @@ function JobCard({
         <Row label="Stake at risk">{botAmount(order.maxSlash)}</Row>
         <Row label="Deliver by">{relativeDeadline(order.deliveryDeadline)}</Row>
       </div>
+      {tx.phase === "pending" && tx.hash && (
+        <p className="mt-3 text-sm text-slate">
+          Waiting for confirmation · <TxLink hash={tx.hash} />
+        </p>
+      )}
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -314,10 +382,60 @@ function JobCard({
 function DeliverCard({order, onDone}: {order: Order; onDone: () => void}) {
   const tx = useMetrxWrite();
   const {wrongNetwork} = useNetworkGate();
-  const [output, setOutput] = useState("");
-  const [notes, setNotes] = useState("");
+  const now = useNow();
+  const draftKey = `delivery:${order.id}`;
+  const [output, setOutput] = useState(() => loadDraft<{output: string; notes: string}>(draftKey)?.output ?? "");
+  const [notes, setNotes] = useState(() => loadDraft<{output: string; notes: string}>(draftKey)?.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<FriendlyError | null>(null);
+
+  useEffect(() => {
+    if (output || notes) saveDraft(draftKey, {output, notes});
+  }, [draftKey, output, notes]);
+
+  const expired = now > Number(order.deliveryDeadline);
+
+  // Past the deadline the contract rejects every delivery, so the form is replaced by the
+  // one action that still works: closing the order and releasing the rest of the stake.
+  if (order.status === "Accepted" && expired) {
+    return (
+      <Card className="p-5">
+        <div className="flex items-center justify-between">
+          <span className="mono text-stone">Order #{order.id.toString()}</span>
+          <StatusPill status={order.status} />
+        </div>
+        <Notice tone="bad" title="Delivery deadline passed">
+          <p>
+            This order can no longer be delivered. Closing it refunds the buyer {botAmount(order.price)} and slashes{" "}
+            {botAmount(order.maxSlash)} of your stake. Until it is closed, that stake stays locked and cannot be
+            withdrawn.
+          </p>
+        </Notice>
+        <div className="mt-4 space-y-3">
+          <ErrorNotice error={tx.error} />
+          {tx.phase === "pending" && tx.hash && (
+            <p className="text-sm text-slate">
+              Waiting for confirmation · <TxLink hash={tx.hash} />
+            </p>
+          )}
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={tx.busy || wrongNetwork}
+            onClick={async () => {
+              const hash = await tx.send("finalizeUndelivered", [order.id]);
+              if (hash) {
+                clearDraft(draftKey);
+                onDone();
+              }
+            }}
+          >
+            {tx.busy ? "Working…" : "Close order and unlock remaining stake"}
+          </button>
+        </div>
+      </Card>
+    );
+  }
 
   if (order.status === "Delivered") {
     return (
@@ -355,7 +473,10 @@ function DeliverCard({order, onDone}: {order: Order; onDone: () => void}) {
       }
       setBusy(false);
       const hash = await tx.send("submitDelivery", [order.id, hashText(text), published.hash]);
-      if (hash) onDone();
+      if (hash) {
+        clearDraft(draftKey);
+        onDone();
+      }
     } catch (e) {
       setBusy(false);
       setError(humanError(e));
@@ -392,6 +513,11 @@ function DeliverCard({order, onDone}: {order: Order; onDone: () => void}) {
       )}
       <div className="mt-4 space-y-3">
         <ErrorNotice error={error ?? tx.error} />
+        {tx.phase === "pending" && tx.hash && (
+          <p className="text-sm text-slate">
+            Waiting for confirmation · <TxLink hash={tx.hash} />
+          </p>
+        )}
         <button
           type="button"
           className="btn btn-primary"

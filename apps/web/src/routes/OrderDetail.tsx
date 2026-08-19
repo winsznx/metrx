@@ -26,7 +26,7 @@ import {
   StatusPill,
   TxLink,
 } from "@/components/primitives";
-import {NetworkBanner} from "@/components/Wallet";
+import {AccountChangeBanner, ConnectButton, NetworkBanner} from "@/components/Wallet";
 import {Timeline} from "@/components/Timeline";
 import {DeployGate} from "@/components/DeployGate";
 
@@ -79,6 +79,7 @@ export default function OrderDetail() {
       <div className="mt-8 space-y-4">
         <DeployGate>
           <NetworkBanner />
+          <AccountChangeBanner />
         </DeployGate>
       </div>
 
@@ -254,9 +255,9 @@ function ActionPanel({
   onDone: () => void;
 }) {
   const {address} = useAccount();
-  const {wrongNetwork} = useNetworkGate();
+  const {wrongNetwork, switchToBot, switching} = useNetworkGate();
   const tx = useMetrxWrite();
-  const action = nextAction(order, {address: address ?? null, isOperator}, now);
+  const action = nextAction(order, {address: address ?? null, isOperator, wrongNetwork}, now);
 
   const run = async () => {
     const map: Record<string, [string, unknown[]] | null> = {
@@ -270,6 +271,34 @@ function ActionPanel({
     const hash = await tx.send(call[0], call[1]);
     if (hash) onDone();
   };
+
+  // A visitor arriving from /proof has no wallet. Offering them a live "Refund the buyer"
+  // button produced a raw ConnectorNotConnectedError, so those states render their own control.
+  if (action.kind === "connect") {
+    return (
+      <Card className="flex flex-wrap items-center justify-between gap-4 p-6">
+        <div>
+          <p className="text-[15px] font-medium text-ink">{action.label}</p>
+          <p className="mt-1 max-w-2xl text-sm text-slate">{action.detail}</p>
+        </div>
+        <ConnectButton />
+      </Card>
+    );
+  }
+
+  if (action.kind === "wrong-network") {
+    return (
+      <Card className="flex flex-wrap items-center justify-between gap-4 p-6">
+        <div>
+          <p className="text-[15px] font-medium text-ink">{action.label}</p>
+          <p className="mt-1 max-w-2xl text-sm text-slate">{action.detail}</p>
+        </div>
+        <button type="button" className="btn btn-primary" onClick={switchToBot} disabled={switching}>
+          {switching ? "Switching…" : "Switch to BOT Chain"}
+        </button>
+      </Card>
+    );
+  }
 
   if (action.kind === "done") {
     return (
@@ -325,7 +354,9 @@ function settlementSentence(order: NonNullable<ReturnType<typeof useOrder>["data
         ? `The AI verifier failed this output at ${scoreLabel(order.scoreBps)}. The buyer received ${botAmount(order.price + order.maxSlash)}: the escrow plus the operator's slashed stake.`
         : `Nothing was delivered before the deadline. The buyer received ${botAmount(order.price + order.maxSlash)}: the escrow plus the operator's slashed stake.`;
     case "Refunded":
-      return `The buyer was refunded ${botAmount(order.price)}. The operator's stake was released without penalty.`;
+      return order.operator === ZERO_ADDRESS
+        ? `No operator accepted this order before its delivery deadline, so the buyer was refunded ${botAmount(order.price)} in full.`
+        : `The buyer was refunded ${botAmount(order.price)}. No verdict arrived in time, so the operator's stake was released without penalty.`;
     case "Cancelled":
       return `The buyer cancelled before any operator committed and took back ${botAmount(order.price)}.`;
     default:

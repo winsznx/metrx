@@ -4,7 +4,7 @@ import {Link} from "react-router-dom";
 import type {Order, OrderStatus} from "@metrx/shared";
 import {useOrders} from "@/lib/contract";
 import {botAmount, relativeDeadline, timestamp} from "@/lib/format";
-import {Card, EmptyState, Eyebrow, Section, Spinner, StatusPill} from "@/components/primitives";
+import {Card, EmptyState, Eyebrow, Notice, Section, Spinner, StatusPill} from "@/components/primitives";
 import {ConnectButton} from "@/components/Wallet";
 import {DeployGate} from "@/components/DeployGate";
 
@@ -62,6 +62,15 @@ export default function Orders() {
       <div className="mt-8">
         {orders.loading ? (
           <Spinner label="Reading BOT Chain…" />
+        ) : orders.error ? (
+          <div className="space-y-3">
+            <Notice tone="bad" title="Could not read BOT Chain">
+              {orders.error.detail} This is a connection problem, not a statement about the contract.
+            </Notice>
+            <button type="button" className="btn btn-ghost" onClick={orders.reload}>
+              Try again
+            </button>
+          </div>
         ) : rows.length === 0 ? (
           <EmptyState title="No orders yet">
             {filter === "all"

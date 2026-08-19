@@ -134,11 +134,36 @@ export function ProofHub() {
         <ErrorNotice error={error} />
       </div>
 
+      {(paid[0] || slashed[0]) && (
+        <div className="mt-10 grid gap-4 md:grid-cols-2">
+          {paid[0] && <FeaturedProof order={paid[0]} kind="PAY" />}
+          {slashed[0] && <FeaturedProof order={slashed[0]} kind="SLASH" />}
+        </div>
+      )}
+
       <div className="mt-10">
         <Eyebrow>All orders</Eyebrow>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {loading ? (
             <Spinner label="Reading BOT Chain…" />
+          ) : error ? (
+            <div className="md:col-span-2">
+              <Notice tone="bad" title="Proof API unreachable">
+                <p>
+                  {error.detail} The contract itself is unaffected — read it directly on{" "}
+                  <a
+                    className="text-ink underline underline-offset-2"
+                    href={CORE_ADDRESS ? explorerAddress(CORE_ADDRESS) : "https://scan.botchain.ai"}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    BOTScan
+                  </a>
+                  , or try <Link className="text-ink underline underline-offset-2" to="/proof/1">order #1</Link> and{" "}
+                  <Link className="text-ink underline underline-offset-2" to="/proof/2">order #2</Link> directly.
+                </p>
+              </Notice>
+            </div>
           ) : orders.length === 0 ? (
             <div className="md:col-span-2">
               <EmptyState title="No orders on this contract yet">
@@ -152,6 +177,37 @@ export function ProofHub() {
       </div>
 
       <div className="mt-10">
+        <Card className="p-6">
+          <Eyebrow>Claim ledger</Eyebrow>
+          <p className="mt-2 text-sm text-slate">
+            Every claim Metrx makes is graded by proof level and re-checked against BOT Chain by a command in the
+            repository. Nothing on this site is asserted above the evidence behind it.
+          </p>
+          <p className="mono mt-3 text-[13px] text-ink">pnpm claim:verify</p>
+          <p className="mt-3 text-sm text-slate">
+            Read the full ledger in{" "}
+            {GITHUB_URL ? (
+              <a
+                className="text-ink underline underline-offset-2"
+                href={`${GITHUB_URL}/blob/main/CLAIM_LEDGER.md`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                CLAIM_LEDGER.md
+              </a>
+            ) : (
+              <span className="mono">CLAIM_LEDGER.md</span>
+            )}
+            , or the honest-status summary in{" "}
+            <Link className="text-ink underline underline-offset-2" to="/docs/what-is-real">
+              what is real
+            </Link>
+            .
+          </p>
+        </Card>
+      </div>
+
+      <div className="mt-4">
         <Notice tone="neutral" title="What this page does not prove">
           Metrx enforces an AI verifier's signed verdict. It does not prove the compute itself was performed correctly,
           privately, or on any particular hardware.{" "}
@@ -162,6 +218,24 @@ export function ProofHub() {
         </Notice>
       </div>
     </Section>
+  );
+}
+
+/** The PAY and SLASH proofs a judge is looking for, promoted above the list. */
+function FeaturedProof({order, kind}: {order: Record<string, string>; kind: "PAY" | "SLASH"}) {
+  return (
+    <Link to={`/proof/${order.id}`} className="card p-7 transition-colors hover:border-ink/25">
+      <Eyebrow>{kind === "PAY" ? "Completed PAY lifecycle" : "Completed SLASH lifecycle"}</Eyebrow>
+      <p className={`headline mt-2 text-[34px] ${kind === "PAY" ? "text-deep" : "text-clay"}`}>{kind}</p>
+      <p className="mt-2 text-sm text-slate">
+        {kind === "PAY"
+          ? `The AI verifier passed the delivered output at ${scoreLabel(Number(order.scoreBps ?? 0))} and the contract released ${botAmount(BigInt(order.price ?? "0"))} to the operator.`
+          : `The AI verifier failed the delivered output. The buyer was refunded and the operator's stake was slashed.`}
+      </p>
+      <p className="mt-4 text-sm text-ink underline decoration-ink/25 underline-offset-2">
+        Open order #{order.id} →
+      </p>
+    </Link>
   );
 }
 
@@ -281,8 +355,50 @@ export function ProofDetail() {
                 </a>
               </Row>
               <Row label="Settled at">{timestamp(Number(proof.order.settledAt))}</Row>
+              {proof.settlementTx && (
+                <Row label="Settlement transaction">
+                  <a
+                    className="mono underline underline-offset-2"
+                    href={`https://scan.botchain.ai/tx/${proof.settlementTx}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {proof.settlementTx.slice(0, 18)}…{proof.settlementTx.slice(-8)}
+                  </a>
+                </Row>
+              )}
             </div>
           </Card>
+
+          {proof.timeline.length > 0 && (
+            <Card className="mt-4 p-7">
+              <Eyebrow>Transaction trail</Eyebrow>
+              <p className="mt-2 text-sm text-slate">
+                Every step of this order as it happened on BOT Chain. Open any of them on the explorer.
+              </p>
+              <ol className="mt-4 space-y-1">
+                {proof.timeline.map((t, i) => (
+                  <li
+                    key={`${t.txHash}-${t.event}-${i}`}
+                    className="flex flex-wrap items-baseline justify-between gap-2 border-b border-ink/8 py-2.5 last:border-0"
+                  >
+                    <span className="text-sm text-ink">{t.label}</span>
+                    <span className="flex items-center gap-3 text-sm text-stone">
+                      {t.timestamp ? timestamp(t.timestamp) : `block ${t.blockNumber}`}
+                      <a
+                        className="mono text-ink underline decoration-ink/25 underline-offset-2 hover:decoration-ink"
+                        href={t.explorer}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {t.txHash.slice(0, 10)}…{t.txHash.slice(-6)}
+                      </a>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          )}
 
           {proof.reason && (
             <Card className="mt-4 p-7">
@@ -293,6 +409,11 @@ export function ProofDetail() {
                 </span>
                 <span className="text-slate">score {scoreLabel(proof.reason.scoreBps)}</span>
                 <span className="mono text-stone">{proof.reason.modelId}</span>
+                {proof.reason.provider && (
+                  <span className={`pill ${proof.reason.mocked ? "bg-amber/20 text-[#7a5518]" : "bg-bot/18 text-deep"}`}>
+                    {proof.reason.mocked ? "mock verifier" : `signed by ${proof.reason.provider}`}
+                  </span>
+                )}
               </div>
               <p className="mt-4 text-[15px] leading-relaxed text-slate">{proof.reason.reason}</p>
               {proof.reason.rubricFindings.length > 0 && (

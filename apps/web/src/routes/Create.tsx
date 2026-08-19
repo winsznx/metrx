@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from "react";
-import {useNavigate} from "react-router-dom";
+import {Link, useNavigate} from "react-router-dom";
 import {useAccount} from "wagmi";
 import {decodeEventLog} from "viem";
 import {hashJson, hashText, type JobSpec} from "@metrx/shared";
@@ -20,9 +20,22 @@ import {
   TxLink,
 } from "@/components/primitives";
 import {ConnectButton, NetworkBanner} from "@/components/Wallet";
+import {GetBot} from "@/components/GetBot";
+import {clearDraft, loadDraft, saveDraft} from "@/lib/drafts";
 import {DeployGate} from "@/components/DeployGate";
 import {usePublicClient} from "wagmi";
 import {CORE_ADDRESS} from "@/lib/config";
+
+const DRAFT_KEY = "create";
+
+interface Draft {
+  title: string;
+  instructions: string;
+  input: string;
+  rubric: string[];
+  price: string;
+  maxSlash: string;
+}
 
 const STEPS = ["Task", "Rubric", "Terms", "Review", "Fund"] as const;
 type Step = (typeof STEPS)[number];
@@ -50,25 +63,32 @@ export default function Create() {
   const client = usePublicClient();
   const tx = useMetrxWrite();
 
+  const restored = useMemo(() => loadDraft<Draft>(DRAFT_KEY), []);
+  const [draftRestored, setDraftRestored] = useState(!!restored);
+
   const [step, setStep] = useState<Step>("Task");
   const [config, setConfig] = useState<VerifierConfig | null>(null);
   const [configError, setConfigError] = useState<FriendlyError | null>(null);
 
-  const [title, setTitle] = useState("Summarize a support ticket");
+  const [title, setTitle] = useState(restored?.title ?? "Summarize a support ticket");
   const [instructions, setInstructions] = useState(
-    "Summarize this support ticket into exactly 3 action items. Do not invent facts that are not in the ticket."
+    restored?.instructions ??
+      "Summarize this support ticket into exactly 3 action items. Do not invent facts that are not in the ticket."
   );
   const [input, setInput] = useState(
-    "Customer says their October invoice was charged twice. They already emailed support once with no reply. They are asking for a refund of the duplicate charge and want confirmation by Friday."
+    restored?.input ??
+      "Customer says their October invoice was charged twice. They already emailed support once with no reply. They are asking for a refund of the duplicate charge and want confirmation by Friday."
   );
-  const [rubric, setRubric] = useState<string[]>([
-    "Output must contain exactly 3 action items",
-    "Output must mention the duplicate charge refund request",
-    "Output must not invent facts absent from the ticket",
-  ]);
+  const [rubric, setRubric] = useState<string[]>(
+    restored?.rubric ?? [
+      "Output must contain exactly 3 action items",
+      "Output must mention the duplicate charge refund request",
+      "Output must not invent facts absent from the ticket",
+    ]
+  );
 
-  const [price, setPrice] = useState("0.02");
-  const [maxSlash, setMaxSlash] = useState("0.01");
+  const [price, setPrice] = useState(restored?.price ?? "0.02");
+  const [maxSlash, setMaxSlash] = useState(restored?.maxSlash ?? "0.01");
   const [deliveryMinutes, setDeliveryMinutes] = useState(120);
   const [verificationChoice, setVerificationChoice] = useState(240);
 
@@ -87,6 +107,8 @@ export default function Create() {
   const [publishError, setPublishError] = useState<FriendlyError | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  /** Set the instant the escrow transaction confirms, independently of decoding the order id. */
+  const [fundedTx, setFundedTx] = useState<`0x${string}` | null>(null);
 
   useEffect(() => {
     api
@@ -94,6 +116,12 @@ export default function Create() {
       .then(setConfig)
       .catch((e) => setConfigError(humanError(e)));
   }, []);
+
+  // Persist on every edit. The app itself tells people to go install a wallet or acquire BOT
+  // mid-flow, so losing the draft on the return trip was self-inflicted.
+  useEffect(() => {
+    saveDraft<Draft>(DRAFT_KEY, {title, instructions, input, rubric, price, maxSlash});
+  }, [title, instructions, input, rubric, price, maxSlash]);
 
   const priceParsed = safeParseBot(price);
   const slashParsed = safeParseBot(maxSlash);
@@ -166,6 +194,11 @@ export default function Create() {
       );
       if (!hash) return;
 
+      // The escrow is mined by the time send() resolves. Everything past this point is a read,
+      // so a read failure must never be presented as a funding failure.
+      setFundedTx(hash);
+      clearDraft(DRAFT_KEY);
+
       const receipt = await client.getTransactionReceipt({hash});
       const created = receipt.logs
         .filter((log) => log.address.toLowerCase() === CORE_ADDRESS?.toLowerCase())
@@ -183,7 +216,7 @@ export default function Create() {
       if (orderId) setTimeout(() => navigate(`/app/orders/${orderId}`), 1200);
     } catch (e) {
       setPublishing(false);
-      setPublishError(humanError(e));
+      if (!fundedTx) setPublishError(humanError(e));
     }
   }
 
@@ -221,6 +254,30 @@ export default function Create() {
           )}
         </DeployGate>
       </div>
+
+      {draftRestored && (
+        <div className="mt-6">
+          <Notice
+            tone="neutral"
+            title="Draft restored"
+            action={
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  clearDraft(DRAFT_KEY);
+                  setDraftRestored(false);
+                  window.location.reload();
+                }}
+              >
+                Start over
+              </button>
+            }
+          >
+            Picked up where you left off. Your draft is saved in this browser only, never sent anywhere until you fund.
+          </Notice>
+        </div>
+      )}
 
       <ol className="mt-10 flex flex-wrap gap-x-6 gap-y-2">
         {STEPS.map((s, i) => (
@@ -333,10 +390,13 @@ export default function Create() {
               </Field>
             </div>
             {insufficient && (
-              <Notice tone="bad" title="Not enough BOT">
-                This wallet holds {botAmount(balance)}, which does not cover the {botAmount(priceParsed.wei)} escrow
-                plus gas.
-              </Notice>
+              <div className="space-y-3">
+                <Notice tone="bad" title="Not enough BOT">
+                  This wallet holds {botAmount(balance)}, which does not cover the {botAmount(priceParsed.wei)} escrow
+                  plus gas.
+                </Notice>
+                <GetBot need="escrow" />
+              </div>
             )}
           </div>
         )}
@@ -374,9 +434,27 @@ export default function Create() {
 
         {step === "Fund" && (
           <div className="space-y-4">
-            {createdOrderId ? (
-              <Notice tone="good" title={`Order #${createdOrderId} is funded and live`}>
-                Escrow of {botAmount(priceParsed.wei)} is held by the contract. Taking you to the order now.
+            {fundedTx ? (
+              <Notice tone="good" title={createdOrderId ? `Order #${createdOrderId} is funded and live` : "Your order is funded"}>
+                <p>
+                  Escrow of {botAmount(priceParsed.wei)} is held by the contract ·{" "}
+                  <TxLink hash={fundedTx} label="view the transaction" />
+                </p>
+                {createdOrderId ? (
+                  <p className="mt-1">Taking you to the order now.</p>
+                ) : (
+                  <p className="mt-1">
+                    The transaction confirmed but the order number could not be read back.{" "}
+                    <Link className="underline underline-offset-2" to="/app/orders">
+                      Open your orders
+                    </Link>{" "}
+                    to find it. Do not fund again.
+                  </p>
+                )}
+                <p className="mt-2 text-ink">
+                  What happens next: an operator accepts and delivers, then anyone runs the AI verifier from the order
+                  page to settle it. Nothing settles on its own, so check back.
+                </p>
               </Notice>
             ) : (
               <>
@@ -392,6 +470,7 @@ export default function Create() {
                   </p>
                 )}
                 <ErrorNotice error={publishError ?? tx.error} />
+                {insufficient && <GetBot need="escrow" />}
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -400,6 +479,7 @@ export default function Create() {
                 >
                   {tx.busy || publishing ? "Working…" : `Fund ${botAmount(priceParsed.wei)}`}
                 </button>
+                {!isConnected && <p className="text-sm text-stone">Connect a wallet above to fund this order.</p>}
               </>
             )}
           </div>
