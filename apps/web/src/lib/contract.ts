@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useRef, useState} from "react";
-import {useAccount, useChainId, usePublicClient, useSwitchChain, useWriteContract} from "wagmi";
+import {useAccount, usePublicClient, useSwitchChain, useWriteContract} from "wagmi";
 import {waitForTransactionReceipt} from "wagmi/actions";
 import type {Abi, Address, Hex, PublicClient} from "viem";
 import {
@@ -13,6 +13,7 @@ import {
 import {CHAIN_ID, CORE_ADDRESS} from "./config";
 import {wagmiConfig} from "./wagmi";
 import {humanError, type FriendlyError} from "./errors";
+import {useWalletChainId} from "./wallet";
 
 export const coreAbi = metrxCoreAbi as unknown as Abi;
 
@@ -35,7 +36,7 @@ type Loadable<T> = {data: T | null; loading: boolean; error: FriendlyError | nul
  * every render, so depending on it would re-fetch on every render, and `key` already
  * describes everything the read depends on.
  */
-function useChainRead<T>(key: string, read: (client: PublicClient) => Promise<T>): Loadable<T> {
+function useChainRead<T>(key: string, read: (client: PublicClient) => Promise<T>, pollMs = 0): Loadable<T> {
   const client = usePublicClient();
   const readRef = useRef(read);
   readRef.current = read;
@@ -70,16 +71,34 @@ function useChainRead<T>(key: string, read: (client: PublicClient) => Promise<T>
     };
   }, [client, key, nonce]);
 
+  useEffect(() => {
+    if (!pollMs) return;
+    const t = setInterval(() => setNonce((n) => n + 1), pollMs);
+    return () => clearInterval(t);
+  }, [pollMs]);
+
   const reload = useCallback(() => setNonce((n) => n + 1), []);
   return {data, loading, error, reload};
 }
 
-export function useOrder(orderId: bigint | null): Loadable<Order> {
+export function useOrder(orderId: bigint | null, pollMs = 15_000): Loadable<Order> {
   return useChainRead(`order:${orderId ?? ""}`, async (client) => {
     if (orderId === null) throw new Error("UnknownOrder");
     const raw = await client.readContract({...coreContract(), functionName: "getOrder", args: [orderId]});
     return decodeOrder(orderId, raw as never);
-  });
+  }, pollMs);
+}
+
+/** Reads run in bounded waves: BOT Chain has no Multicall3, and unbounded parallel eth_calls
+ *  get throttled by the public RPC. */
+const READ_CONCURRENCY = 8;
+
+async function inWaves<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += READ_CONCURRENCY) {
+    out.push(...(await Promise.all(items.slice(i, i + READ_CONCURRENCY).map(fn))));
+  }
+  return out;
 }
 
 export function useOrders(limit = 50): Loadable<Order[]> {
@@ -89,14 +108,15 @@ export function useOrders(limit = 50): Loadable<Order[]> {
     const start = total > BigInt(limit) ? total - BigInt(limit) + 1n : 1n;
     const ids: bigint[] = [];
     for (let i = total; i >= start; i--) ids.push(i);
-    const raw = await client.multicall({
-      contracts: ids.map((id) => ({...coreContract(), functionName: "getOrder", args: [id]}) as const),
-      allowFailure: true,
-    });
-    return ids
-      .map((id, i) => (raw[i]?.status === "success" ? decodeOrder(id, raw[i]!.result as never) : null))
-      .filter((o): o is Order => o !== null);
-  });
+
+    const raw = await inWaves(ids, (id) =>
+      client
+        .readContract({...coreContract(), functionName: "getOrder", args: [id]})
+        .then((r) => decodeOrder(id, r as never))
+        .catch(() => null)
+    );
+    return raw.filter((o): o is Order => o !== null);
+  }, 20_000);
 }
 
 export function useOperator(address: Address | undefined): Loadable<OperatorProfile> {
@@ -115,11 +135,12 @@ export const isRegistered = (op: OperatorProfile | null) => !!op && op.owner !==
 
 export function useNetworkGate() {
   const {isConnected} = useAccount();
-  const chainId = useChainId();
+  const walletChainId = useWalletChainId();
   const {switchChain, isPending} = useSwitchChain();
-  const wrongNetwork = isConnected && chainId !== CHAIN_ID;
+  // wagmi reports the configured chain, not the wallet's, so the real chain comes from the provider.
+  const wrongNetwork = isConnected && walletChainId !== null && walletChainId !== CHAIN_ID;
   const switchToBot = useCallback(() => switchChain({chainId: CHAIN_ID}), [switchChain]);
-  return {wrongNetwork, switching: isPending, switchToBot, chainId};
+  return {wrongNetwork, switching: isPending, switchToBot, chainId: walletChainId ?? CHAIN_ID};
 }
 
 // ---------------------------------------------------------------------------
@@ -197,25 +218,39 @@ export function useNow(intervalMs = 15_000) {
   return now;
 }
 
-export function useBotBalance() {
+/**
+ * Live BOT balance.
+ *
+ * Read once, a zero balance permanently disabled the Fund button: topping up the wallet in
+ * another tab could never unstick it. This re-reads on an interval and on window focus, which
+ * is exactly when someone comes back from acquiring BOT.
+ */
+export function useBotBalance(intervalMs = 12_000) {
   const {address} = useAccount();
   const client = usePublicClient();
   const [balance, setBalance] = useState<bigint | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
     if (!address || !client) {
       setBalance(null);
       return;
     }
-    client
-      .getBalance({address})
-      .then((b) => !cancelled && setBalance(b))
-      .catch(() => !cancelled && setBalance(null));
+    let cancelled = false;
+    const read = () =>
+      client
+        .getBalance({address})
+        .then((b) => !cancelled && setBalance(b))
+        .catch(() => undefined);
+
+    read();
+    const timer = setInterval(read, intervalMs);
+    window.addEventListener("focus", read);
     return () => {
       cancelled = true;
+      clearInterval(timer);
+      window.removeEventListener("focus", read);
     };
-  }, [address, client]);
+  }, [address, client, intervalMs]);
 
   return balance;
 }

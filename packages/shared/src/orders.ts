@@ -1,5 +1,5 @@
 import type {Address} from "viem";
-import {ORDER_STATUS, VERDICT, type Order, type OperatorProfile} from "./types.js";
+import {ORDER_STATUS, VERDICT, isTerminal, type Order, type OperatorProfile} from "./types.js";
 
 /** Raw tuple/struct shape returned by `getOrder`. */
 type RawOrder = {
@@ -110,9 +110,29 @@ export interface NextAction {
 
 export function nextAction(
   order: Order,
-  viewer: {address: Address | null; isOperator: boolean},
+  viewer: {address: Address | null; isOperator: boolean; wrongNetwork?: boolean},
   now: number
 ): NextAction {
+  if (isTerminal(order.status)) {
+    return {kind: "done", label: "Settled", detail: "This order reached a terminal state.", actor: "none"};
+  }
+  if (!viewer.address) {
+    return {
+      kind: "connect",
+      label: "Connect a wallet to act on this order",
+      detail: "Reading is open to everyone. Moving funds needs a wallet on BOT Chain Mainnet.",
+      actor: "none",
+    };
+  }
+  if (viewer.wrongNetwork) {
+    return {
+      kind: "wrong-network",
+      label: "Switch to BOT Chain Mainnet",
+      detail: "Your wallet is on another network, so this order's actions are unavailable.",
+      actor: "none",
+    };
+  }
+
   const isBuyer = !!viewer.address && viewer.address.toLowerCase() === order.buyer.toLowerCase();
   const isAssigned = !!viewer.address && viewer.address.toLowerCase() === order.operator.toLowerCase();
   const pastDelivery = now > Number(order.deliveryDeadline);
