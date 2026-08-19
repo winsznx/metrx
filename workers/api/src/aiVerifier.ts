@@ -419,6 +419,8 @@ export async function verify(
     rubricFindings: raw.rubricFindings ?? [],
     modelId,
     evaluatedAt: Math.max(Math.floor(Date.now() / 1000), notBefore),
+    provider,
+    mocked: provider === "mock",
   };
 
   return {

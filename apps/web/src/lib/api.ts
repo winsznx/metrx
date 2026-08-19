@@ -53,6 +53,15 @@ export interface SignedVerdictResponse {
   submit: {address: Address; functionName: string; args: [string, number, number, Hex, number, Hex]};
 }
 
+export interface TimelineEntry {
+  event: string;
+  label: string;
+  txHash: Hex;
+  blockNumber: string;
+  timestamp: number | null;
+  explorer: string;
+}
+
 export interface ProofResponse {
   orderId: string;
   chainId: number;
@@ -64,6 +73,8 @@ export interface ProofResponse {
   delivery: DeliveryArtifact | null;
   reason: VerifierReason | null;
   hashChecks: {label: string; onChain: Hex; recomputed: Hex | null; matches: boolean}[];
+  timeline: TimelineEntry[];
+  settlementTx: Hex | null;
   explorer: {contract: string; buyer: string; operator: string; verifier: string};
   generatedAt: number;
 }
@@ -119,7 +130,14 @@ export const api = {
   runVerifier: (orderId: string | bigint) =>
     request<SignedVerdictResponse>(`/api/verify/${orderId}`, {method: "POST", body: "{}"}),
 
+  /** A certificate already signed for this order, so a reload never forces a fresh model run. */
+  existingVerdict: (orderId: string | bigint) =>
+    request<SignedVerdictResponse>(`/api/verify/${orderId}`).catch(() => null),
+
   proof: (orderId: string | bigint) => request<ProofResponse>(`/api/proof/${orderId}`),
+
+  timeline: (orderId: string | bigint) =>
+    request<ProofResponse>(`/api/proof/${orderId}`).then((p) => p.timeline),
 
   proofIndex: (limit = 25) => request<ProofIndexResponse>(`/api/proof?limit=${limit}`),
 };

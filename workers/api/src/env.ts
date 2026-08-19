@@ -3,6 +3,8 @@ export interface Env {
   BOT_RPC_URL: string;
   BOT_CHAIN_ID: string;
   METRX_CORE_ADDRESS: string;
+  /** Block MetrxCore was deployed at. Bounds the log scan that rebuilds order timelines. */
+  METRX_DEPLOY_BLOCK?: string;
   AI_PROVIDER: string;
   AI_MODEL_ID: string;
   ALLOWED_ORIGIN: string;

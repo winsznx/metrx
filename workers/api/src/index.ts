@@ -164,11 +164,42 @@ app.get("/api/orders/:id", async (c) => {
  * settlement certificate. It never broadcasts: the signature is handed back so a wallet
  * (or anyone at all) can submit `settleWithAIVerdict` themselves.
  */
+/**
+ * A signed certificate is deterministic for a given (order, output), so it is cached.
+ *
+ * Without this every page refresh burned a full completion on a shared model quota and
+ * produced a *different* signature, because `evaluatedAt` moves and the reason hash moves
+ * with it. A user who lost the tab between signing and settling could be unable to settle at
+ * all once the quota ran out.
+ */
+const certKey = (orderId: bigint, outputHash: string) => `verdict:${orderId}:${outputHash.toLowerCase()}`;
+
+async function cachedVerdict(env: Env, key: string): Promise<unknown | null> {
+  if (!env.ARTIFACTS) return null;
+  const raw = await env.ARTIFACTS.get(key);
+  return raw ? JSON.parse(raw) : null;
+}
+
+/** Returns a previously signed certificate without spending model quota. */
+app.get("/api/verify/:orderId", async (c) => {
+  const orderId = parseOrderId(c.req.param("orderId"));
+  const order = await readOrder(c.env, orderId);
+  const cached = order.outputHash === ZERO_HASH ? null : await cachedVerdict(c.env, certKey(orderId, order.outputHash));
+  if (!cached) throw notFound("no_verdict", "No verdict has been signed for this order yet.");
+  return c.json(cached);
+});
+
 app.post("/api/verify/:orderId", async (c) => {
   const env = c.env;
   const orderId = parseOrderId(c.req.param("orderId"));
   const core = coreAddress(env);
   const order = await readOrder(env, orderId);
+
+  const cacheKey = order.outputHash === ZERO_HASH ? null : certKey(orderId, order.outputHash);
+  if (cacheKey) {
+    const cached = await cachedVerdict(env, cacheKey);
+    if (cached) return c.json(cached);
+  }
 
   if (order.status !== "Delivered") {
     throw badRequest(
@@ -246,7 +277,7 @@ app.post("/api/verify/:orderId", async (c) => {
     evaluatedAt,
   });
 
-  return c.json({
+  const response = {
     orderId: orderId.toString(),
     verdict: result.verdict,
     scoreBps: result.scoreBps,
@@ -276,7 +307,15 @@ app.post("/api/verify/:orderId", async (c) => {
         signature,
       ],
     },
-  });
+  };
+
+  // Cached against the committed output hash: a redelivery is impossible on a delivered order,
+  // so this can never serve a certificate for output the contract did not commit.
+  if (cacheKey && env.ARTIFACTS) {
+    await env.ARTIFACTS.put(cacheKey, JSON.stringify(response), {expirationTtl: 60 * 60 * 24 * 30});
+  }
+
+  return c.json(response);
 });
 
 // ---------------------------------------------------------------------------

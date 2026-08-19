@@ -8,7 +8,8 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 BOT_RPC_URL = "https://rpc.botchain.ai"
 BOT_CHAIN_ID = "677"
-METRX_CORE_ADDRESS = "0x868ee03536A046DcFa568BbaE29C1C3a9f85B018"
+METRX_CORE_ADDRESS = "0x8b607937eE86Bfc9de57F5d2F8E9d02F58415532"
+METRX_DEPLOY_BLOCK = "20153854"
 # The verifier model. `openai/gpt-oss-120b` on Groq supports strict json_schema structured
 # outputs, so the verdict schema is enforced by the model rather than repaired afterwards.
 # Requires `wrangler secret put GROQ_API_KEY`. Set AI_PROVIDER="mock" to run the offline

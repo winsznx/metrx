@@ -9,7 +9,7 @@ import {
   type JobSpec,
   type VerifierReason,
 } from "@metrx/shared";
-import {coreAddress, readAiVerifier, readOrder, serialiseOrder} from "./chain.js";
+import {coreAddress, readAiVerifier, readOrder, readOrderTimeline, serialiseOrder} from "./chain.js";
 import {getArtifact, parseArtifact} from "./artifacts.js";
 import type {Env} from "./env.js";
 
@@ -21,7 +21,11 @@ import type {Env} from "./env.js";
  * settled against. A missing artifact is reported as missing, never silently skipped.
  */
 export async function proofBundle(env: Env, orderId: bigint) {
-  const [order, aiVerifier] = await Promise.all([readOrder(env, orderId), readAiVerifier(env)]);
+  const [order, aiVerifier, timeline] = await Promise.all([
+    readOrder(env, orderId),
+    readAiVerifier(env),
+    readOrderTimeline(env, orderId),
+  ]);
   const core = coreAddress(env);
 
   const specRecord = order.jobSpecHash !== ZERO_HASH ? await getArtifact(env, order.jobSpecHash) : null;
@@ -61,6 +65,8 @@ export async function proofBundle(env: Env, orderId: bigint) {
     delivery,
     reason,
     hashChecks,
+    timeline,
+    settlementTx: timeline.find((t) => t.event === "AIVerdictSettled")?.txHash ?? null,
     explorer: {
       contract: explorerAddress(core),
       buyer: explorerAddress(order.buyer),

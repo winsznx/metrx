@@ -108,4 +108,7 @@ export interface VerifierReason {
   rubricFindings: {rubricIndex: number; satisfied: boolean; note: string}[];
   modelId: string;
   evaluatedAt: number;
+  /** Which backend produced this verdict, and whether it was the deterministic stand-in. */
+  provider?: string;
+  mocked?: boolean;
 }
