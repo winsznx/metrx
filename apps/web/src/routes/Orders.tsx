@@ -1,6 +1,6 @@
 import {useMemo, useState} from "react";
 import {useAccount} from "wagmi";
-import {Link} from "react-router-dom";
+import {Link, useNavigate} from "react-router-dom";
 import type {Order, OrderStatus} from "@metrx/shared";
 import {useOrders} from "@/lib/contract";
 import {botAmount, relativeDeadline, timestamp} from "@/lib/format";
@@ -11,9 +11,12 @@ import {DeployGate} from "@/components/DeployGate";
 type Filter = "all" | "buying" | "operating";
 
 export default function Orders() {
+  const navigate = useNavigate();
   const {address, isConnected} = useAccount();
-  const orders = useOrders(100);
+  const [limit, setLimit] = useState(100);
+  const orders = useOrders(limit);
   const [filter, setFilter] = useState<Filter>("all");
+  const [lookup, setLookup] = useState("");
 
   const rows = useMemo(() => {
     const all = orders.data ?? [];
@@ -59,7 +62,34 @@ export default function Orders() {
         </DeployGate>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-stone">
+          {orders.total > 0n
+            ? `Showing the ${Math.min(Number(orders.total), rows.length)} most recent of ${orders.total} order${orders.total === 1n ? "" : "s"}.`
+            : ""}
+        </p>
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (/^\d+$/.test(lookup)) navigate(`/app/orders/${lookup}`);
+          }}
+        >
+          <input
+            className="field w-40 py-1.5 text-[13px]"
+            value={lookup}
+            onChange={(e) => setLookup(e.target.value)}
+            placeholder="Open order #"
+            inputMode="numeric"
+            aria-label="Open an order by number"
+          />
+          <button type="submit" className="btn btn-ghost px-3 py-1.5 text-[13px]" disabled={!/^\d+$/.test(lookup)}>
+            Open
+          </button>
+        </form>
+      </div>
+
+      <div className="mt-4">
         {orders.loading ? (
           <Spinner label="Reading BOT Chain…" />
         ) : orders.error ? (
@@ -95,6 +125,13 @@ export default function Orders() {
                 ))}
               </tbody>
             </table>
+            {BigInt(rows.length) < orders.total && filter === "all" && (
+              <div className="mt-6 text-center">
+                <button type="button" className="btn btn-ghost" onClick={() => setLimit((l) => l + 100)}>
+                  Load older orders
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

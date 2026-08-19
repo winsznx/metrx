@@ -24,6 +24,7 @@ import {
 import {AccountChangeBanner, ConnectButton, NetworkBanner} from "@/components/Wallet";
 import {GetBot} from "@/components/GetBot";
 import {clearDraft, loadDraft, saveDraft} from "@/lib/drafts";
+import {ClaimBanner} from "@/components/ClaimBanner";
 import {DeployGate} from "@/components/DeployGate";
 
 export default function Operator() {
@@ -61,6 +62,7 @@ export default function Operator() {
         <DeployGate>
           <NetworkBanner />
           <AccountChangeBanner />
+          <ClaimBanner />
           {!isConnected && (
             <Notice tone="neutral" title="Connect a wallet to register" action={<ConnectButton />}>
               Registration is a single transaction that posts your stake in native BOT.
@@ -68,6 +70,39 @@ export default function Operator() {
           )}
         </DeployGate>
       </div>
+
+      {!isConnected && (
+        <div className="mt-12">
+          <Eyebrow>Open funded jobs</Eyebrow>
+          <p className="mt-1 text-sm text-slate">
+            Live from BOT Chain. Reading takes no wallet — you only need one to accept.
+          </p>
+          <div className="mt-4 grid gap-2 md:grid-cols-2">
+            {orders.loading ? (
+              <Spinner label="Reading BOT Chain…" />
+            ) : open.length === 0 ? (
+              <EmptyState title="No open orders right now">
+                Nothing is funded and waiting for an operator at the moment.
+              </EmptyState>
+            ) : (
+              open.map((o) => (
+                <Card key={o.id.toString()} className="p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="mono text-stone">Order #{o.id.toString()}</span>
+                    <StatusPill status={o.status} />
+                  </div>
+                  <Row label="Escrow">{botAmount(o.price)}</Row>
+                  <Row label="Stake at risk">{botAmount(o.maxSlash)}</Row>
+                  <Row label="Deliver by">{relativeDeadline(o.deliveryDeadline)}</Row>
+                  <Link to={`/app/orders/${o.id}`} className="btn btn-ghost mt-4">
+                    Read the job
+                  </Link>
+                </Card>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {isConnected && (
         <>

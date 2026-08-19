@@ -1,12 +1,13 @@
 import {Link} from "react-router-dom";
 import {useAccount} from "wagmi";
 import {useMemo} from "react";
-import {availableStake, type Order} from "@metrx/shared";
+import {activeDeadline, availableStake, isExpired, nextAction, type Order} from "@metrx/shared";
 import {isRegistered, useBotBalance, useOperator, useOrders, useNow} from "@/lib/contract";
-import {botAmount} from "@/lib/format";
+import {botAmount, relativeDeadline} from "@/lib/format";
 import {Card, EmptyState, Eyebrow, Notice, Section, Spinner, Stat, StatusPill} from "@/components/primitives";
 import type {FriendlyError} from "@/lib/errors";
 import {AccountChangeBanner, ConnectButton, NetworkBanner, WalletSummary} from "@/components/Wallet";
+import {ClaimBanner} from "@/components/ClaimBanner";
 import {DeployGate} from "@/components/DeployGate";
 
 export default function Dashboard() {
@@ -15,6 +16,11 @@ export default function Dashboard() {
   const orders = useOrders(60);
   const operator = useOperator(address);
   const now = useNow();
+
+  const viewer = useMemo(
+    () => ({address: address ?? null, isOperator: isRegistered(operator.data)}),
+    [address, operator.data]
+  );
 
   const mine = useMemo(() => {
     if (!address) return {bought: [], operated: [], open: [] as Order[]};
@@ -43,6 +49,7 @@ export default function Dashboard() {
         <DeployGate>
           <NetworkBanner />
           <AccountChangeBanner />
+          <ClaimBanner />
         </DeployGate>
       </div>
 
@@ -109,9 +116,13 @@ export default function Dashboard() {
               loading={orders.loading}
               error={orders.error}
               onRetry={orders.reload}
-              orders={[...mine.bought, ...mine.operated].filter((o) =>
-                ["Funded", "Accepted", "Delivered"].includes(o.status)
-              )}
+              viewer={viewer}
+              now={now}
+              orders={[...mine.bought, ...mine.operated].filter((o) => {
+                if (!["Funded", "Accepted", "Delivered"].includes(o.status)) return false;
+                const a = nextAction(o, viewer, now);
+                return a.kind !== "wait" && a.kind !== "done";
+              })}
             />
             <OrderColumn
               title="Open jobs on the network"
@@ -119,6 +130,8 @@ export default function Dashboard() {
               loading={orders.loading}
               error={orders.error}
               onRetry={orders.reload}
+              viewer={viewer}
+              now={now}
               orders={mine.open}
             />
           </div>
@@ -177,6 +190,8 @@ function OrderColumn({
   loading,
   error,
   onRetry,
+  viewer,
+  now,
 }: {
   title: string;
   orders: Order[];
@@ -184,6 +199,8 @@ function OrderColumn({
   loading: boolean;
   error?: FriendlyError | null;
   onRetry?: () => void;
+  viewer?: {address: `0x${string}` | null; isOperator: boolean};
+  now?: number;
 }) {
   const unique = Array.from(new Map(orders.map((o) => [o.id.toString(), o])).values());
   return (
@@ -209,14 +226,27 @@ function OrderColumn({
         ) : unique.length === 0 ? (
           <EmptyState title={empty} />
         ) : (
-          unique.map((o) => <OrderRow key={o.id.toString()} order={o} />)
+          unique.map((o) => <OrderRow key={o.id.toString()} order={o} viewer={viewer} now={now} />)
         )}
       </div>
     </div>
   );
 }
 
-export function OrderRow({order}: {order: Order}) {
+export function OrderRow({
+  order,
+  viewer,
+  now,
+}: {
+  order: Order;
+  viewer?: {address: `0x${string}` | null; isOperator: boolean};
+  now?: number;
+}) {
+  const at = now ?? Math.floor(Date.now() / 1000);
+  const expired = isExpired(order, at);
+  const deadline = activeDeadline(order);
+  const action = viewer ? nextAction(order, viewer, at) : null;
+
   return (
     <Link
       to={`/app/orders/${order.id}`}
@@ -225,8 +255,17 @@ export function OrderRow({order}: {order: Order}) {
       <div className="min-w-0">
         <p className="mono text-stone">Order #{order.id.toString()}</p>
         <p className="truncate text-[15px] text-ink">{botAmount(order.price)}</p>
+        {action && action.kind !== "done" && action.kind !== "wait" && (
+          <p className="mt-0.5 truncate text-[13px] text-ink">{action.label} →</p>
+        )}
+        {deadline !== null && (
+          <p className="mt-0.5 text-xs text-stone">
+            {expired ? "deadline passed " : "due "}
+            {relativeDeadline(deadline, at)}
+          </p>
+        )}
       </div>
-      <StatusPill status={order.status} />
+      <StatusPill status={order.status} expired={expired} />
     </Link>
   );
 }

@@ -68,6 +68,7 @@ export default function Create() {
 
   const [step, setStep] = useState<Step>("Task");
   const [config, setConfig] = useState<VerifierConfig | null>(null);
+  const [supply, setSupply] = useState<{count: number; activeCount: number; maxAvailableStake: string} | null>(null);
   const [configError, setConfigError] = useState<FriendlyError | null>(null);
 
   const [title, setTitle] = useState(restored?.title ?? "Summarize a support ticket");
@@ -104,6 +105,11 @@ export default function Create() {
     ? verificationChoice
     : verificationOptions[0]!;
 
+  const [preview, setPreview] = useState<Awaited<ReturnType<typeof api.previewVerdict>> | null>(null);
+  const [previewOutput, setPreviewOutput] = useState("");
+  const [previewing, setPreviewing] = useState(false);
+  const [previewError, setPreviewError] = useState<FriendlyError | null>(null);
+
   const [publishError, setPublishError] = useState<FriendlyError | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
@@ -115,6 +121,7 @@ export default function Create() {
       .config()
       .then(setConfig)
       .catch((e) => setConfigError(humanError(e)));
+    api.operators().then(setSupply).catch(() => setSupply(null));
   }, []);
 
   // Persist on every edit. The app itself tells people to go install a wallet or acquire BOT
@@ -166,6 +173,10 @@ export default function Create() {
   };
 
   const insufficient = priceParsed.wei !== null && balance !== null && balance < priceParsed.wei;
+  const unacceptable =
+    !!supply && supply.activeCount > 0 && slashParsed.wei !== null && slashParsed.wei > BigInt(supply.maxAvailableStake);
+  const overCollateralised =
+    priceParsed.wei !== null && slashParsed.wei !== null && slashParsed.wei > priceParsed.wei * 5n;
 
   async function fund() {
     if (!priceParsed.wei || !slashParsed.wei || !client) return;
@@ -365,6 +376,39 @@ export default function Create() {
                 inputMode="decimal"
               />
             </Field>
+            {supply && (
+              <Notice
+                tone={unacceptable ? "warn" : "neutral"}
+                title={
+                  supply.activeCount === 0
+                    ? "No operators are registered yet"
+                    : `${supply.activeCount} operator${supply.activeCount === 1 ? "" : "s"} available, most unlocked stake ${botAmount(BigInt(supply.maxAvailableStake))}`
+                }
+              >
+                {supply.activeCount === 0 ? (
+                  <p>
+                    Nobody can accept this order right now. You can still fund it — the escrow is yours to cancel at any
+                    time before an operator commits, and it refunds automatically if the delivery deadline passes.
+                  </p>
+                ) : unacceptable ? (
+                  <p>
+                    Your max slash is more than any registered operator currently has unlocked, so none of them can
+                    accept this order. Lower it, or fund anyway and wait for an operator to stake more.
+                  </p>
+                ) : (
+                  <p>
+                    An operator must lock this much stake to accept, so a higher number buys you more protection and a
+                    smaller pool of operators who can take the job.
+                  </p>
+                )}
+              </Notice>
+            )}
+            {overCollateralised && (
+              <Notice tone="warn" title="Max slash is much larger than the price">
+                Asking for {botAmount(slashParsed.wei)} of stake against a {botAmount(priceParsed.wei)} job is a hard
+                trade for an operator to accept. Most orders set it at or below the price.
+              </Notice>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Delivery deadline" hint="After this, an undelivered order refunds you and slashes the operator.">
                 <select className="field" value={deliveryMinutes} onChange={(e) => setDeliveryMinutes(Number(e.target.value))}>
@@ -375,7 +419,10 @@ export default function Create() {
                   ))}
                 </select>
               </Field>
-              <Field label="Verification deadline" hint="After this, a delivered order with no verdict refunds you.">
+              <Field
+                label="Verification deadline"
+                hint="After this, a delivered order with no verdict refunds you and the operator is paid nothing, so give the verifier room."
+              >
                 <select
                   className="field"
                   value={verificationMinutes}
@@ -398,6 +445,67 @@ export default function Create() {
                 <GetBot need="escrow" />
               </div>
             )}
+          </div>
+        )}
+
+        {step === "Rubric" && (
+          <div className="mt-8 border-t border-ink/10 pt-6">
+            <Eyebrow>Test your rubric first</Eyebrow>
+            <p className="mt-2 text-[15px] text-slate">
+              Paste an example of the output you would accept and run the real verifier against it. Nothing is published
+              and nothing is spent — this is only to check your rubric says what you think it says.
+            </p>
+            <div className="mt-4">
+              <textarea
+                className="field min-h-24"
+                value={previewOutput}
+                onChange={(e) => setPreviewOutput(e.target.value)}
+                maxLength={20_000}
+                placeholder="Paste an example output…"
+              />
+            </div>
+            <div className="mt-3 space-y-3">
+              <ErrorNotice error={previewError} />
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={!previewOutput.trim() || previewing || spec.rubric.length === 0}
+                onClick={async () => {
+                  setPreviewError(null);
+                  setPreviewing(true);
+                  try {
+                    setPreview(await api.previewVerdict(spec, previewOutput));
+                  } catch (e) {
+                    setPreviewError(humanError(e));
+                  } finally {
+                    setPreviewing(false);
+                  }
+                }}
+              >
+                {previewing ? "Evaluating…" : "Preview the verdict"}
+              </button>
+              {preview && (
+                <Notice
+                  tone={preview.verdict === "PASS" ? "good" : "warn"}
+                  title={`Preview verdict: ${preview.verdict} at ${(preview.scoreBps / 100).toFixed(0)}%`}
+                >
+                  <p>{preview.reason}</p>
+                  {preview.rubricFindings.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {preview.rubricFindings.map((f) => (
+                        <li key={f.rubricIndex}>
+                          <span className={f.satisfied ? "text-deep" : "text-clay"}>
+                            {f.satisfied ? "met" : "not met"}
+                          </span>{" "}
+                          — rule {f.rubricIndex}: {f.note}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="mt-2 text-ink">This was a dry run. No order exists and nothing was signed.</p>
+                </Notice>
+              )}
+            </div>
           </div>
         )}
 

@@ -1,6 +1,6 @@
 import {Link} from "react-router-dom";
 import {useEffect, useState} from "react";
-import {ORDER_STATUS, explorerAddress, type OrderStatus} from "@metrx/shared";
+import {ORDER_STATUS, explorerContract, type OrderStatus} from "@metrx/shared";
 import {CORE_ADDRESS, DEMO_VIDEO_URL, GITHUB_URL} from "@/lib/config";
 import {api, type ProofIndexResponse} from "@/lib/api";
 import {Card, Eyebrow, Section, Chip, EmptyState, StatusPill} from "@/components/primitives";
@@ -237,7 +237,7 @@ function LiveProof() {
           {CORE_ADDRESS ? (
             <a
               className="mono mt-2 block break-all text-ink underline decoration-ink/25 underline-offset-2"
-              href={explorerAddress(CORE_ADDRESS)}
+              href={explorerContract(CORE_ADDRESS)}
               target="_blank"
               rel="noreferrer"
             >
@@ -274,7 +274,9 @@ function LiveProof() {
               Watch the 3-minute walkthrough
             </a>
           ) : (
-            <p className="mt-2 text-sm text-stone">Walkthrough video pending.</p>
+            <Link className="mt-2 block text-sm text-ink underline decoration-ink/25 underline-offset-2" to="/app/onboarding">
+              Walk through it yourself in five steps
+            </Link>
           )}
         </Card>
       </div>

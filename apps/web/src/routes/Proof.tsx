@@ -1,8 +1,8 @@
 import {useEffect, useState} from "react";
 import {Link, useParams} from "react-router-dom";
-import {ORDER_STATUS, ZERO_ADDRESS, explorerAddress, type OrderStatus} from "@metrx/shared";
+import {ORDER_STATUS, ZERO_ADDRESS, explorerAddress, explorerContract, type OrderStatus} from "@metrx/shared";
 import {api, type ProofIndexResponse, type ProofResponse} from "@/lib/api";
-import {CORE_ADDRESS, DEMO_VIDEO_URL, GITHUB_URL} from "@/lib/config";
+import {API_BASE, CORE_ADDRESS, DEMO_VIDEO_URL, GITHUB_URL} from "@/lib/config";
 import {botAmount, scoreLabel, timestamp} from "@/lib/format";
 import {humanError, type FriendlyError} from "@/lib/errors";
 import {
@@ -76,7 +76,7 @@ export function ProofHub() {
           {CORE_ADDRESS ? (
             <a
               className="mono mt-2 block break-all text-ink underline decoration-ink/25 underline-offset-2"
-              href={explorerAddress(CORE_ADDRESS)}
+              href={explorerContract(CORE_ADDRESS)}
               target="_blank"
               rel="noreferrer"
             >
@@ -125,7 +125,9 @@ export function ProofHub() {
               Demo video
             </a>
           ) : (
-            <p className="mt-1 text-sm text-stone">Demo video pending.</p>
+            <Link className="mt-1 block text-sm text-ink underline decoration-ink/25 underline-offset-2" to="/app/onboarding">
+              Run the lifecycle yourself
+            </Link>
           )}
         </Card>
       </div>
@@ -337,7 +339,7 @@ export function ProofDetail() {
               <Row label="Settlement contract">
                 <a
                   className="mono underline underline-offset-2"
-                  href={proof.explorer.contract}
+                  href={`${proof.explorer.contract}#code`}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -354,6 +356,16 @@ export function ProofDetail() {
                   {proof.aiVerifier}
                 </a>
               </Row>
+              <Row label="Created">{timestamp(Number(proof.order.createdAt))}</Row>
+              {Number(proof.order.acceptedAt) > 0 && (
+                <Row label="Accepted">{timestamp(Number(proof.order.acceptedAt))}</Row>
+              )}
+              {Number(proof.order.deliveredAt) > 0 && (
+                <Row label="Delivered">{timestamp(Number(proof.order.deliveredAt))}</Row>
+              )}
+              {Number(proof.order.evaluatedAt) > 0 && (
+                <Row label="Verdict signed">{timestamp(Number(proof.order.evaluatedAt))}</Row>
+              )}
               <Row label="Settled at">{timestamp(Number(proof.order.settledAt))}</Row>
               {proof.settlementTx && (
                 <Row label="Settlement transaction">
@@ -467,18 +479,49 @@ export function ProofDetail() {
             </Card>
           )}
 
+          {proof.certificate && (
+            <Card className="mt-4 p-7">
+              <Eyebrow>The signed certificate</Eyebrow>
+              <p className="mt-2 text-sm text-slate">
+                This is the exact EIP-712 payload the AI verifier signed and the contract recovered. Nothing else can
+                move this order's escrow.
+              </p>
+              <div className="mt-4">
+                <Row label="Signed by">
+                  <a className="mono underline underline-offset-2" href={proof.explorer.verifier} target="_blank" rel="noreferrer">
+                    {proof.certificate.verifierAddress}
+                  </a>
+                </Row>
+                <Row label="EIP-712 digest">
+                  <Mono value={proof.certificate.digest} />
+                </Row>
+                <Row label="Signature">
+                  <Mono value={proof.certificate.signature} lead={12} tail={8} />
+                </Row>
+                <Row label="Evaluated at">{timestamp(proof.certificate.evaluatedAt)}</Row>
+              </div>
+              <details className="mt-4">
+                <summary className="cursor-pointer text-sm text-slate hover:text-ink">Show the raw typed data</summary>
+                <pre className="mono mt-3 overflow-x-auto rounded-xl bg-mist/45 p-4 text-[12px] leading-relaxed">
+                  {JSON.stringify(proof.certificate.typedData, null, 2)}
+                </pre>
+              </details>
+            </Card>
+          )}
+
           <Card className="mt-4 p-7">
             <Eyebrow>Hash checks</Eyebrow>
             <p className="mt-2 text-sm text-slate">
-              Each published artifact is re-hashed in your browser's request and compared against what the contract
-              stored. A mismatch would mean the evidence was swapped after settlement.
+              The verifier API recomputes each hash from the published artifact and compares it against what the
+              contract stored. A mismatch would mean the evidence was swapped after settlement. Open any artifact below
+              and re-derive the hash yourself — keccak256 of the raw bytes for text, of the canonical JSON for objects.
             </p>
             <div className="mt-4 space-y-2">
               {proof.hashChecks.map((c) => (
                 <div key={c.label} className="flex flex-wrap items-center justify-between gap-2 border-b border-ink/8 py-2 last:border-0">
                   <span className="text-sm text-ink">{c.label}</span>
                   <span className="flex items-center gap-3">
-                    <Mono value={c.onChain} copy={false} />
+                    <Mono value={c.onChain} href={`${API_BASE}${c.artifactUrl}`} copy={false} />
                     <span className={`pill ${c.matches ? "bg-bot/18 text-deep" : "bg-clay/14 text-clay"}`}>
                       {c.matches ? "matches" : c.recomputed === null ? "artifact missing" : "MISMATCH"}
                     </span>
