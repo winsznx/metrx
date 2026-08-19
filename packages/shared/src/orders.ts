@@ -213,3 +213,17 @@ export function nextAction(
       return {kind: "done", label: "Settled", detail: "This order reached a terminal state.", actor: "none"};
   }
 }
+
+/** True when an order's current deadline has passed and the state can be forced by anyone. */
+export function isExpired(order: Order, now: number): boolean {
+  if (order.status === "Funded" || order.status === "Accepted") return now > Number(order.deliveryDeadline);
+  if (order.status === "Delivered") return now > Number(order.verificationDeadline);
+  return false;
+}
+
+/** The deadline that currently matters, or null once the order is terminal. */
+export function activeDeadline(order: Order): bigint | null {
+  if (order.status === "Funded" || order.status === "Accepted") return order.deliveryDeadline;
+  if (order.status === "Delivered") return order.verificationDeadline;
+  return null;
+}

@@ -29,7 +29,11 @@ export function Card({children, className = ""}: {children: ReactNode; className
 }
 
 /** Settlement state is the one place colour is spent, so a badge always carries meaning. */
-export function StatusPill({status}: {status: OrderStatus}) {
+export function StatusPill({status, expired = false}: {status: OrderStatus; expired?: boolean}) {
+  if (expired) {
+    return <span className="pill bg-amber/25 text-[#7a5518]">Expired · action needed</span>;
+  }
+
   const map: Record<OrderStatus, {label: string; className: string}> = {
     None: {label: "Unknown", className: "bg-mist text-slate"},
     Funded: {label: "Funded", className: "bg-mist text-ink"},

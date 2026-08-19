@@ -17,3 +17,5 @@ export const botChain = defineChain({
 
 export const explorerTx = (hash: string) => `${BOT_EXPLORER_URL}/tx/${hash}`;
 export const explorerAddress = (address: string) => `${BOT_EXPLORER_URL}/address/${address}`;
+/** Contract links land on the verified source rather than the bare address page. */
+export const explorerContract = (address: string) => `${BOT_EXPLORER_URL}/address/${address}#code`;

@@ -101,9 +101,12 @@ async function inWaves<T, R>(items: T[], fn: (item: T) => Promise<R>): Promise<R
   return out;
 }
 
-export function useOrders(limit = 50): Loadable<Order[]> {
-  return useChainRead(`orders:${limit}`, async (client) => {
-    const total = (await client.readContract({...coreContract(), functionName: "totalOrders"})) as bigint;
+export function useOrders(limit = 50): Loadable<Order[]> & {total: bigint} {
+  const [total, setTotal] = useState(0n);
+  const read = useChainRead(`orders:${limit}`, async (client) => {
+    const count = (await client.readContract({...coreContract(), functionName: "totalOrders"})) as bigint;
+    setTotal(count);
+    const total = count;
     if (total === 0n) return [];
     const start = total > BigInt(limit) ? total - BigInt(limit) + 1n : 1n;
     const ids: bigint[] = [];
@@ -117,6 +120,8 @@ export function useOrders(limit = 50): Loadable<Order[]> {
     );
     return raw.filter((o): o is Order => o !== null);
   }, 20_000);
+
+  return {...read, total};
 }
 
 export function useOperator(address: Address | undefined): Loadable<OperatorProfile> {
@@ -253,4 +258,28 @@ export function useBotBalance(intervalMs = 12_000) {
   }, [address, client, intervalMs]);
 
   return balance;
+}
+
+/**
+ * BOT credited after a direct payout call failed.
+ *
+ * `_payout` forwards a bounded gas stipend and falls back to a pull credit, so a contract
+ * wallet or an expensive receive hook lands here instead of stranding the escrow. Without a
+ * surface for it, that money was reachable only by calling the contract by hand.
+ */
+export function useWithdrawable(): {amount: bigint; reload: () => void} {
+  const {address} = useAccount();
+  const read = useChainRead(
+    `withdrawable:${address ?? ""}`,
+    async (client) => {
+      if (!address) return 0n;
+      return (await client.readContract({
+        ...coreContract(),
+        functionName: "withdrawable",
+        args: [address],
+      })) as bigint;
+    },
+    30_000
+  );
+  return {amount: read.data ?? 0n, reload: read.reload};
 }
