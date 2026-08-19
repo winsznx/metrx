@@ -14,11 +14,15 @@ Metrx is an AI-native settlement layer on BOT Chain Mainnet. A buyer funds a com
 | AI verifier | [`0x10053A1406C7024Fd237fe4192BC15A0Bc018C8d`](https://scan.botchain.ai/address/0x10053A1406C7024Fd237fe4192BC15A0Bc018C8d) — `openai/gpt-oss-120b` via Groq |
 | Completed PAY order | [order #2](https://metrx.pages.dev/proof/2) · [settlement tx](https://scan.botchain.ai/tx/0x6af63304339ba08b75f7c89f3405946573955943d81a363fcd03ccf980617fb2) — PASS at 100%, operator paid |
 | Completed REFUND/SLASH order | [order #3](https://metrx.pages.dev/proof/3) · [settlement tx](https://scan.botchain.ai/tx/0x4e4bab0afb4013bd8524c1486ab3ae37aa2edb82ffa5f163bfa60db924d46a72) — FAIL at 0%, buyer refunded, operator slashed |
-| Fastest proof path | Open [/proof](https://metrx.pages.dev/proof), pick the PAY card, read the signed verdict and the settlement transaction |
+| Fastest proof path | Open [/proof](https://metrx.pages.dev/proof), click the PAY card, read the AI verdict, the signed EIP-712 certificate, and the transaction trail linking every step to BOTScan |
 
 Honest status: v1 proves publicly auditable AI adjudication for bounded compute jobs. It does not claim generalized trustless compute, private compute, or tokenized GPU ownership. See [WHAT_IS_REAL.md](WHAT_IS_REAL.md).
 
 `pnpm claim:verify` re-reads every claim above from BOT Chain and currently reports **9/9 verified**.
+
+No wallet is needed to read any of it. If you want to try the mechanism without spending anything,
+the rubric preview on [/app/create](https://metrx.pages.dev/app/create) runs the real verifier
+against a sample output with no order and no signature.
 
 ---
 

@@ -33,6 +33,9 @@ Last updated: 2026-08-19.
 | Verdicts came from a real model, not the mock | `PROOF_RUNS.json` records `provider: groq`, `mocked: false` |
 | Every published artifact still reproduces its on-chain hash | `/api/proof/2` and `/api/proof/3` both report 7/7 hash checks matching |
 | Every settlement is reachable from the UI | `/proof/:id` renders the full transaction trail, rebuilt from event logs |
+| The signed certificate is public for every settled order | Recovered from the settlement transaction's calldata, so it exists even for orders this service never signed |
+| A buyer can see the supply side before funding | `/api/operators` reports registered operators and the largest unlocked stake, surfaced on the Terms step |
+| A rubric can be tested before any money moves | `/api/preview` runs the real verifier with no order, no chain write and no signature |
 
 `pnpm claim:verify` re-reads all of this from chain.
 
@@ -96,6 +99,6 @@ signed them is recorded in `PROOF_RUNS.json`.
 
 - 52 contract tests: `pnpm contracts:test`
 - 53 reference model tests: `cd packages/reference && pnpm test`
-- 20 worker tests (10 end-to-end + 10 Groq provider): `cd workers/api && pnpm test`
+- 27 worker tests (17 end-to-end + 10 Groq provider): `cd workers/api && pnpm test`
 - Chain facts: `pnpm seam:check`, which rewrites [SEAM_REPORT.md](SEAM_REPORT.md) from live RPC
 - Claim status: `pnpm claim:verify`, which re-reads every claim from BOT Chain

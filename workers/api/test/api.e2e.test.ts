@@ -94,6 +94,7 @@ beforeAll(async () => {
     BOT_RPC_URL: RPC,
     BOT_CHAIN_ID: "31337",
     METRX_CORE_ADDRESS: core,
+    METRX_DEPLOY_BLOCK: "0",
     AI_PROVIDER: "mock",
     AI_MODEL_ID: MODEL_ID,
     ALLOWED_ORIGIN: "*",
@@ -293,6 +294,98 @@ describe("worker API", () => {
     const res = await call("/api/verify/999999", {method: "POST", body: "{}"});
     expect(res.status).toBe(404);
     expect((await json<{error: string}>(res)).error).toBe("unknown_order");
+  });
+
+  it("serves a cached certificate instead of re-running the model", async () => {
+    const orderId = await orderThroughDelivery(
+      ["Output must mention the duplicate charge refund"],
+      "The duplicate charge refund has been issued."
+    );
+
+    const first = await json<VerifyResponse>(await call(`/api/verify/${orderId}`, {method: "POST", body: "{}"}));
+    const second = await json<VerifyResponse>(await call(`/api/verify/${orderId}`, {method: "POST", body: "{}"}));
+
+    // A fresh run would move evaluatedAt, which moves reasonHash, which moves the signature —
+    // and would leave a settled-but-unsettleable order if quota ran out in between.
+    expect(second.signature).toBe(first.signature);
+    expect(second.reasonHash).toBe(first.reasonHash);
+    expect(second.evaluatedAt).toBe(first.evaluatedAt);
+
+    const restored = await json<VerifyResponse>(await call(`/api/verify/${orderId}`));
+    expect(restored.signature).toBe(first.signature);
+  }, 60_000);
+
+  it("reports the supply side so a buyer can see whether anyone can accept", async () => {
+    const supply = await json<{count: number; activeCount: number; maxAvailableStake: string}>(
+      await call("/api/operators")
+    );
+    expect(supply.count).toBeGreaterThan(0);
+    expect(supply.activeCount).toBeGreaterThan(0);
+    expect(BigInt(supply.maxAvailableStake)).toBeGreaterThan(0n);
+  }, 60_000);
+
+  it("indexes orders by address from logs rather than scanning the tail", async () => {
+    const buyer = privateKeyToAccount(BUYER_PK).address;
+    const mine = await json<{orders: {buyer: string}[]; returned: number}>(
+      await call(`/api/orders?address=${buyer}`)
+    );
+    expect(mine.returned).toBeGreaterThan(0);
+    expect(mine.orders.every((o) => o.buyer.toLowerCase() === buyer.toLowerCase())).toBe(true);
+
+    const stranger = await json<{returned: number}>(
+      await call("/api/orders?address=0x000000000000000000000000000000000000dEaD")
+    );
+    expect(stranger.returned).toBe(0);
+  }, 60_000);
+
+  it("publishes the transaction trail and the signed certificate on the proof bundle", async () => {
+    const orderId = await orderThroughDelivery(
+      ["Output must mention the duplicate charge refund"],
+      "Refund issued for the duplicate charge."
+    );
+    const verdict = await json<VerifyResponse>(await call(`/api/verify/${orderId}`, {method: "POST", body: "{}"}));
+    await settle(orderId, verdict);
+
+    const proof = await json<{
+      timeline: {event: string; txHash: string; explorer: string}[];
+      settlementTx: string | null;
+      certificate: {signature: string; digest: string} | null;
+      hashChecks: {artifactUrl: string}[];
+    }>(await call(`/api/proof/${orderId}`));
+
+    expect(proof.timeline.map((t) => t.event)).toEqual(
+      expect.arrayContaining(["OrderCreated", "OrderAccepted", "DeliverySubmitted", "AIVerdictSettled"])
+    );
+    expect(proof.timeline.every((t) => /^0x[0-9a-f]{64}$/i.test(t.txHash))).toBe(true);
+    expect(proof.settlementTx).toMatch(/^0x[0-9a-f]{64}$/i);
+    expect(proof.certificate?.signature).toBe(verdict.signature);
+    expect(proof.hashChecks.every((c) => c.artifactUrl.startsWith("/api/artifacts/0x"))).toBe(true);
+  }, 60_000);
+
+  it("previews a verdict with no order, no chain write and no signature", async () => {
+    const res = await call("/api/preview", {
+      method: "POST",
+      body: JSON.stringify({
+        jobSpec: {
+          title: "t",
+          taskType: "text-eval",
+          instructions: "i",
+          input: "x",
+          rubric: ["Output must mention the duplicate charge refund"],
+          modelId: MODEL_ID,
+        },
+        output: "The duplicate charge refund was processed.",
+      }),
+    });
+    const preview = await json<{preview: boolean; verdict: string; signature?: string}>(res);
+    expect(preview.preview).toBe(true);
+    expect(["PASS", "FAIL"]).toContain(preview.verdict);
+    expect(preview.signature).toBeUndefined();
+  }, 60_000);
+
+  it("rejects a preview with no rubric or no output", async () => {
+    const res = await call("/api/preview", {method: "POST", body: JSON.stringify({jobSpec: {rubric: []}, output: ""})});
+    expect(res.status).toBe(400);
   });
 
   it("refuses to judge when the published artifact is missing", async () => {

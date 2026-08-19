@@ -312,6 +312,78 @@ describe("EIP-712 parity against the deployed bytecode", () => {
     );
   }, 60_000);
 
+  it("an operator can stop and resume taking new work", async () => {
+    const operator = wallet(OPERATOR_PK);
+    const abi = artifact.abi;
+
+    const setActive = async (active: boolean) => {
+      const hash = await operator.writeContract({
+        account: operator.account!,
+        chain: anvilChain,
+        address: core,
+        abi,
+        functionName: "setOperatorActive",
+        args: [active],
+      });
+      return publicClient.waitForTransactionReceipt({hash});
+    };
+
+    await setActive(false);
+    expect(
+      ((await publicClient.readContract({
+        address: core,
+        abi,
+        functionName: "getOperator",
+        args: [operator.account!.address],
+      })) as {active: boolean}).active
+    ).toBe(false);
+
+    // A paused operator must be unable to take new work, which is the point of the flag.
+    const buyer = wallet(BUYER_PK);
+    const now = Math.floor(Date.now() / 1000);
+    const created = await buyer.writeContract({
+      account: buyer.account!,
+      chain: anvilChain,
+      address: core,
+      abi,
+      functionName: "createOrder",
+      args: [
+        hashJson(JOB_SPEC),
+        hashText(JOB_SPEC.input),
+        hashJson(JOB_SPEC.rubric),
+        hashText(JOB_SPEC.modelId),
+        BigInt(now + 3600),
+        BigInt(now + 7200),
+        parseEther("0.1"),
+      ],
+      value: parseEther("0.2"),
+    });
+    await publicClient.waitForTransactionReceipt({hash: created});
+    const orderId = (await publicClient.readContract({address: core, abi, functionName: "totalOrders"})) as bigint;
+
+    await expect(
+      operator.writeContract({
+        account: operator.account!,
+        chain: anvilChain,
+        address: core,
+        abi,
+        functionName: "acceptOrder",
+        args: [orderId],
+      })
+    ).rejects.toThrow();
+
+    await setActive(true);
+    const accepted = await operator.writeContract({
+      account: operator.account!,
+      chain: anvilChain,
+      address: core,
+      abi,
+      functionName: "acceptOrder",
+      args: [orderId],
+    });
+    expect((await publicClient.waitForTransactionReceipt({hash: accepted})).status).toBe("success");
+  }, 60_000);
+
   it("a certificate signed by any other key is rejected on chain", async () => {
     const {orderId, reasonHash, evaluatedAt, scoreBps} = await runLifecycle("impostor path", "PASS");
 
