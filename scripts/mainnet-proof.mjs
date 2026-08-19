@@ -165,6 +165,12 @@ async function runLifecycle(kind) {
   if (!config.verifier.signerMatchesContract) {
     throw new Error("The API's verifier key does not match the address the contract trusts. Fix before running proof.");
   }
+  if ((config.contract || "").toLowerCase() !== CORE.toLowerCase()) {
+    throw new Error(
+      `The verifier API is configured for ${config.contract}, but this run targets ${CORE}. ` +
+        "Update METRX_CORE_ADDRESS on the worker and redeploy before running proof."
+    );
+  }
 
   const published = await apiPost("/api/artifacts", {kind: "job-spec", content: spec});
   const {jobSpecHash, inputHash, rubricHash, modelHash} = published.derived;

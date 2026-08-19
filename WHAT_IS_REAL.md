@@ -3,20 +3,20 @@
 A plain account of what Metrx does today. Nothing here is aspirational, and the status column
 is updated only when there is a transaction hash behind it.
 
-Last updated: 2026-08-17.
+Last updated: 2026-08-19.
 
 ## Built and tested
 
 | Thing | Status |
 | --- | --- |
 | `MetrxCore.sol` — native BOT escrow, operator staking, EIP-712 verdict settlement | Written, compiles under solc 0.8.28 |
-| Foundry test suite — 44 unit/integration + 6 fuzz properties | 50/50 passing |
+| Foundry test suite — 46 unit/integration + 6 fuzz properties | 52/52 passing |
 | TypeScript reference model of the same settlement rules | 53/53 passing |
 | AI verifier service — groq (default), anthropic, openai, workers-ai, mock | 10 provider tests passing |
 | Schema-enforced verdicts via Groq strict `json_schema` on `openai/gpt-oss-120b` | Request shape and refusal paths tested |
 | Cross-language EIP-712 parity (TS signer vs Solidity recovery) | Verified against compiled bytecode on anvil |
 | Full product loop through the real API routes (fund → deliver → verify → settle → proof) | Verified on anvil, PAY and SLASH |
-| Web app — landing, buyer wizard, operator console, verifier surface, proof pages | Builds, typechecks |
+| Web app — landing, onboarding checklist, buyer wizard, operator console, verifier surface, settings, proof pages | Builds, typechecks |
 | Live BOT Chain seam check | 10/12 passing, see [SEAM_REPORT.md](SEAM_REPORT.md) |
 | Web app deployed | Live at https://metrx.pages.dev |
 | Verifier service deployed with durable KV artifact storage | Live at https://metrx-api.timjosh507.workers.dev |
@@ -25,21 +25,22 @@ Last updated: 2026-08-17.
 
 | Thing | Evidence |
 | --- | --- |
-| `MetrxCore` deployed to chain 677 | [`0x868ee03536A046DcFa568BbaE29C1C3a9f85B018`](https://scan.botchain.ai/address/0x868ee03536A046DcFa568BbaE29C1C3a9f85B018), 10,521 bytes of code |
-| Source verified on BOTScan | [Verified via Blockscout](https://scan.botchain.ai/address/0x868ee03536A046DcFa568BbaE29C1C3a9f85B018#code), solc 0.8.28, optimizer 200 runs |
-| One completed PAY lifecycle | Order #1 → `Paid`. Groq `openai/gpt-oss-120b` returned PASS at 100%; [settlement tx](https://scan.botchain.ai/tx/0xc4ed4b8476ecd5d82d28a2bd63092e0d66514fde51355fb9780484caf6b4afd9) |
-| One completed SLASH lifecycle | Order #2 → `Slashed`. Same model returned FAIL at 0% with all three rubric items unmet; [settlement tx](https://scan.botchain.ai/tx/0x540d789e2018f1226773579224f88fa591c67ba95c9fba152dcfbfbbb7a6405b) |
-| Verdicts came from a real model, not the mock | `PROOF_RUNS.json` records `provider: groq`, `mocked: false` for both runs |
-| Every published artifact still reproduces its on-chain hash | `/api/proof/1` and `/api/proof/2` both report 7/7 hash checks matching |
+| `MetrxCore` deployed to chain 677 | [`0x8b607937eE86Bfc9de57F5d2F8E9d02F58415532`](https://scan.botchain.ai/address/0x8b607937eE86Bfc9de57F5d2F8E9d02F58415532), deployed at block 20153854 |
+| Source verified on BOTScan | [Verified via Blockscout](https://scan.botchain.ai/address/0x8b607937eE86Bfc9de57F5d2F8E9d02F58415532#code), solc 0.8.28, optimizer 200 runs |
+| Completed PAY lifecycle | Order #2 → `Paid`. Groq `openai/gpt-oss-120b` returned PASS at 100%; [settlement tx](https://scan.botchain.ai/tx/0x6af63304339ba08b75f7c89f3405946573955943d81a363fcd03ccf980617fb2) |
+| Completed SLASH lifecycle | Order #3 → `Slashed`. The same model returned FAIL at 0% with all three rubric items unmet; [settlement tx](https://scan.botchain.ai/tx/0x4e4bab0afb4013bd8524c1486ab3ae37aa2edb82ffa5f163bfa60db924d46a72) |
+| A second PAY lifecycle | Order #1 → `Paid`, settled from the app's own verifier surface; [settlement tx](https://scan.botchain.ai/tx/0x0ae2979524aa9f4a901be5e7accd593c02a3604b0bc37d346032d6ac1243132d) |
+| Verdicts came from a real model, not the mock | `PROOF_RUNS.json` records `provider: groq`, `mocked: false` |
+| Every published artifact still reproduces its on-chain hash | `/api/proof/2` and `/api/proof/3` both report 7/7 hash checks matching |
+| Every settlement is reachable from the UI | `/proof/:id` renders the full transaction trail, rebuilt from event logs |
 
-`pnpm claim:verify` re-reads all of this from chain and reports **9/9 verified**.
+`pnpm claim:verify` re-reads all of this from chain.
 
 ## Not yet done
 
 | Thing | Status |
 | --- | --- |
 | Demo video | Script written in [DEMO.md](DEMO.md), not yet recorded |
-| Public GitHub repository | Repo not yet published, so `VITE_GITHUB_URL` is unset and the app hides the link rather than shipping a 404 |
 
 ## What is real about the mechanism
 
@@ -93,7 +94,7 @@ signed them is recorded in `PROOF_RUNS.json`.
 
 ## Where the numbers come from
 
-- 50 contract tests: `pnpm contracts:test`
+- 52 contract tests: `pnpm contracts:test`
 - 53 reference model tests: `cd packages/reference && pnpm test`
 - 20 worker tests (10 end-to-end + 10 Groq provider): `cd workers/api && pnpm test`
 - Chain facts: `pnpm seam:check`, which rewrites [SEAM_REPORT.md](SEAM_REPORT.md) from live RPC

@@ -1,8 +1,8 @@
 {
   "chainId": 677,
-  "metrxCore": "0x868ee03536A046DcFa568BbaE29C1C3a9f85B018",
+  "metrxCore": "0x8b607937eE86Bfc9de57F5d2F8E9d02F58415532",
   "aiVerifier": "0x10053A1406C7024Fd237fe4192BC15A0Bc018C8d",
-  "domainSeparator": "0x97f9f26381327d44ffd88768b559689d8ccee0a37280f85cd96786eb0ae67236",
-  "deployedAtBlock": 19930429,
-  "deployTxHash": "0x3eaf5811797a8b739e2897175fa4937c3de0df722370e5eede82dd7068f1b196"
+  "domainSeparator": "0x80bdaaedb7ea6d485da0e0b0e411d5493f296a2b9f414147ba2d6840d48d25a3",
+  "deployedAtBlock": 20153854,
+  "deployTxHash": "0x9cb0c561e32601a3b2de2a976b25c92966945b59706daefcaf37064319ba38ee"
 }

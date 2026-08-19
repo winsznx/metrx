@@ -10,10 +10,10 @@ Metrx is an AI-native settlement layer on BOT Chain Mainnet. A buyer funds a com
 | Verifier API | https://metrx-api.timjosh507.workers.dev |
 | Demo video | _pending_ |
 | Network | BOT Chain Mainnet, Chain ID 677 |
-| Contract | [`0x868ee03536A046DcFa568BbaE29C1C3a9f85B018`](https://scan.botchain.ai/address/0x868ee03536A046DcFa568BbaE29C1C3a9f85B018#code) — source verified on BOTScan |
+| Contract | [`0x8b607937eE86Bfc9de57F5d2F8E9d02F58415532`](https://scan.botchain.ai/address/0x8b607937eE86Bfc9de57F5d2F8E9d02F58415532#code) — source verified on BOTScan |
 | AI verifier | [`0x10053A1406C7024Fd237fe4192BC15A0Bc018C8d`](https://scan.botchain.ai/address/0x10053A1406C7024Fd237fe4192BC15A0Bc018C8d) — `openai/gpt-oss-120b` via Groq |
-| Completed PAY order | [order #1](https://metrx.pages.dev/proof/1) · [settlement tx](https://scan.botchain.ai/tx/0xc4ed4b8476ecd5d82d28a2bd63092e0d66514fde51355fb9780484caf6b4afd9) — PASS at 100%, operator paid |
-| Completed REFUND/SLASH order | [order #2](https://metrx.pages.dev/proof/2) · [settlement tx](https://scan.botchain.ai/tx/0x540d789e2018f1226773579224f88fa591c67ba95c9fba152dcfbfbbb7a6405b) — FAIL at 0%, buyer refunded, operator slashed |
+| Completed PAY order | [order #2](https://metrx.pages.dev/proof/2) · [settlement tx](https://scan.botchain.ai/tx/0x6af63304339ba08b75f7c89f3405946573955943d81a363fcd03ccf980617fb2) — PASS at 100%, operator paid |
+| Completed REFUND/SLASH order | [order #3](https://metrx.pages.dev/proof/3) · [settlement tx](https://scan.botchain.ai/tx/0x4e4bab0afb4013bd8524c1486ab3ae37aa2edb82ffa5f163bfa60db924d46a72) — FAIL at 0%, buyer refunded, operator slashed |
 | Fastest proof path | Open [/proof](https://metrx.pages.dev/proof), pick the PAY card, read the signed verdict and the settlement transaction |
 
 Honest status: v1 proves publicly auditable AI adjudication for bounded compute jobs. It does not claim generalized trustless compute, private compute, or tokenized GPU ownership. See [WHAT_IS_REAL.md](WHAT_IS_REAL.md).

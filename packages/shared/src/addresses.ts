@@ -20,10 +20,10 @@ export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as cons
 
 export const DEPLOYMENT: Deployment = {
   chainId: 677,
-  metrxCore: "0x868ee03536A046DcFa568BbaE29C1C3a9f85B018",
+  metrxCore: "0x8b607937eE86Bfc9de57F5d2F8E9d02F58415532",
   aiVerifier: "0x10053A1406C7024Fd237fe4192BC15A0Bc018C8d",
-  deployedAtBlock: 19930429,
-  deployTxHash: "0x3eaf5811797a8b739e2897175fa4937c3de0df722370e5eede82dd7068f1b196",
+  deployedAtBlock: 20153854,
+  deployTxHash: "0x9cb0c561e32601a3b2de2a976b25c92966945b59706daefcaf37064319ba38ee",
   verifiedOnExplorer: false,
 };
 
