@@ -148,8 +148,30 @@ on every response, because a well-formed verdict can still be self-contradictory
 - **Griefing on verifier timeout.** An operator that delivers but never gets a certificate
   submitted loses the sale, though not its stake. Mitigated by letting anyone, including the
   operator, run the verifier and submit.
-- **Unaudited.** The contract is small, has no admin surface, and is covered by 50 Foundry
+- **Unaudited.** The contract is small, has no admin surface, and is covered by 52 Foundry
   tests plus an independent reference model, but it has not had a third-party audit.
+
+## Operator exit
+
+`setOperatorActive(false)` stops an operator receiving new work. It blocks `acceptOrder` and
+nothing else: orders already accepted continue, and stake locked against them stays locked until
+those orders settle. There is deliberately no way to abandon in-flight work, because the buyer's
+escrow depends on it.
+
+## Denial of settlement
+
+Model calls run on one shared provider key, so an open verifier endpoint is an availability risk
+for every user rather than only a cost problem. Three things bound it:
+
+- A signed certificate is cached against the committed output hash, so repeat requests for the
+  same order never spend quota and always return the identical signature.
+- `POST /api/verify/:orderId` and `POST /api/preview` are rate limited per IP.
+- The certificate is also recoverable from the settlement transaction's calldata, so losing the
+  cache never loses the evidence.
+
+If the verifier is unreachable for an entire verification window, the order still resolves: the
+buyer is refunded and the operator's stake is released. The operator loses the sale, which is why
+both the create wizard and the operator console state that consequence before the fact.
 
 ## Reporting
 

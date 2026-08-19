@@ -69,7 +69,7 @@ When it lands, show three things in order:
 ## 2:15 — the failure case (30s)
 
 This is the part that separates escrow from settlement. Either run a second job live with a
-deliberately off-topic output, or open [order #2](https://metrx.pages.dev/proof/2) from `/proof`.
+deliberately off-topic output, or open [order #3](https://metrx.pages.dev/proof/3) from `/proof`.
 
 Show the verifier's FAIL reasoning naming which rubric items were missed, then the outcome:
 buyer refunded the escrow **plus** the operator's slashed stake.
@@ -80,7 +80,7 @@ buyer refunded the escrow **plus** the operator's slashed stake.
 
 Open `/proof` in a fresh window with no wallet connected.
 
-Open the PAY order. Scroll to **Hash checks** and let it sit on screen:
+Open the PAY order ([#2](https://metrx.pages.dev/proof/2)). Scroll to **Hash checks** and let it sit on screen:
 
 > "Every published artifact is re-hashed and compared to what the contract stored. If anyone
 > swapped the evidence after settlement, this table says MISMATCH."
@@ -103,5 +103,5 @@ Close on the BOTScan link for the settlement transaction.
 
 1. Open `/proof` with no wallet and read both lifecycles.
 2. Click through to BOTScan and see the settlement transactions.
-3. Open the repo, run `pnpm contracts:test` and `pnpm test`, and get 50 and 73 passing.
+3. Open the repo, run `pnpm contracts:test` and `pnpm test`, and get 52 and 80 passing.
 4. Run `pnpm claim:verify` and watch every claim re-read from chain.

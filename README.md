@@ -47,7 +47,7 @@ What makes the verdict auditable rather than a black box:
 ## Repository layout
 
 ```
-contracts/          Foundry. MetrxCore.sol + SettlementMath.sol, 50 tests including fuzz
+contracts/          Foundry. MetrxCore.sol + SettlementMath.sol, 52 tests including fuzz
 packages/reference/ Independent TypeScript model of the same settlement rules, 53 tests
 packages/shared/    Chain config, ABI, canonical hashing, EIP-712 types
 workers/api/        Cloudflare Worker: AI verifier (Groq), artifact store, proof bundles
@@ -62,7 +62,7 @@ git clone --recurse-submodules https://github.com/winsznx/metrx && cd metrx
 pnpm install
 pnpm keys:generate      # writes DEPLOYER / AI_VERIFIER / DEMO_OPERATOR keys to .env
 pnpm seam:check         # live BOT Chain assumptions -> SEAM_REPORT.md
-pnpm contracts:test     # 50 Foundry tests
+pnpm contracts:test     # 52 Foundry tests
 pnpm test               # reference model + worker end-to-end tests
 ```
 

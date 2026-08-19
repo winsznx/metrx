@@ -152,7 +152,7 @@ simply fails to recover the verifier address.
 
 ```mermaid
 graph LR
-  A["pnpm seam:check<br/>chain 677 live, deployer funded"] --> B["pnpm contracts:test<br/>50 Foundry tests"]
+  A["pnpm seam:check<br/>chain 677 live, deployer funded"] --> B["pnpm contracts:test<br/>52 Foundry tests"]
   B --> C["pnpm test<br/>reference model + full loop on anvil"]
   C --> D["pnpm contracts:deploy<br/>--legacy broadcast"]
   D --> E["pnpm abi:sync<br/>address into shared package"]
@@ -187,8 +187,39 @@ for durable storage.
 
 ## Why there is no database
 
-Order state, operator stake, and settlement outcomes all live in the contract. The app reads
-them with `multicall` and the worker reads them with `readContract`. Artifacts are the only
-off-chain data, and they are content-addressed, so tampering is detectable by anyone with the
-transaction. Adding an indexer would introduce a second source of truth that could disagree
+Order state, operator stake, and settlement outcomes all live in the contract. Artifacts are the
+only off-chain data, and they are content-addressed, so tampering is detectable by anyone holding
+the transaction. Adding an indexer would introduce a second source of truth that could disagree
 with the chain, which is exactly the failure Metrx exists to remove.
+
+Reads are plain `eth_call`s. BOT Chain has no Multicall3 deployment, so anything built on viem's
+`multicall` fails with `ChainDoesNotSupportContract` — and because that throws before the first
+order is read, it surfaces as an empty list rather than as an error. The app batches in bounded
+waves; the worker coalesces calls into JSON-RPC batches to stay under the Workers subrequest
+ceiling.
+
+Where an index is genuinely needed, it is derived from event logs rather than stored. `OrderCreated`
+indexes the buyer, `OrderAccepted` indexes the operator, and `OperatorRegistered` indexes the
+operator address, which is enough to answer "my orders" and "who can accept this" without a
+database and without a contract change. The same trick recovers a settlement's transaction hash,
+which a contract can never store about itself.
+
+## API surface
+
+Every route is public and unauthenticated. Nothing here can move funds: the worker signs, and
+whoever wants settlement pays their own gas to submit.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /api/health` | liveness |
+| `GET /api/config` | chain, contract, verifier model and address, artifact backend in use |
+| `POST /api/artifacts` | publish a job spec, delivery or reason; returns the content hash and derived sub-hashes |
+| `GET /api/artifacts/:hash` | fetch a published artifact so anyone can re-derive its hash |
+| `GET /api/orders` | recent orders, or `?address=` for one participant's orders via the log index |
+| `GET /api/orders/:id` | one order as stored on chain |
+| `GET /api/operators` | the supply side: registered operators and the largest unlocked stake |
+| `POST /api/verify/:orderId` | run the verifier and sign a certificate; cached per committed output, rate limited |
+| `GET /api/verify/:orderId` | a previously signed certificate, so a reload never re-spends quota |
+| `POST /api/preview` | dry-run a rubric against a sample output; no order, no chain write, no signature |
+| `GET /api/proof` | index of settled orders |
+| `GET /api/proof/:orderId` | full public evidence: artifacts, hash checks, transaction trail, certificate |
