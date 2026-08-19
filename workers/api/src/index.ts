@@ -2,9 +2,28 @@ import {Hono} from "hono";
 import {cors} from "hono/cors";
 import type {Address, Hex} from "viem";
 import {ZERO_HASH, hashJson, hashText, isTerminal, type DeliveryArtifact, type JobSpec} from "@metrx/shared";
-import {ApiError, badRequest, notFound, type Env} from "./env.js";
-import {backendName, getArtifact, parseArtifact, putArtifact, requireArtifact, type ArtifactKind} from "./artifacts.js";
-import {coreAddress, readAiVerifier, readOrder, readOrders, readTotalOrders, serialiseOrder} from "./chain.js";
+import {ApiError, badRequest, notFound, rateLimited, type Env} from "./env.js";
+import {
+  backendName,
+  getArtifact,
+  getRecord,
+  parseArtifact,
+  putArtifact,
+  putRecord,
+  requireArtifact,
+  type ArtifactKind,
+} from "./artifacts.js";
+import {
+  coreAddress,
+  readAiVerifier,
+  readOperators,
+  readOrder,
+  readOrderIdsForAddress,
+  readOrders,
+  readOrdersByIds,
+  readTotalOrders,
+  serialiseOrder,
+} from "./chain.js";
 import {modelIdOf, modelHashOf, resolveProvider, verify} from "./aiVerifier.js";
 import {serialiseTypedData, signVerdict, verifierAccount} from "./eip712.js";
 import {proofBundle} from "./proof.js";
@@ -25,6 +44,23 @@ app.onError((err, c) => {
   console.error("unhandled", err);
   return c.json({error: "internal", message: err.message ?? "Unexpected worker error."}, 500);
 });
+
+/**
+ * Coarse per-IP limit on the endpoints that spend model quota.
+ * One shared provider key means an open endpoint is a denial-of-settlement vector for every
+ * other user, not just a cost problem.
+ */
+async function enforceRateLimit(env: Env, req: Request, bucket: string, perMinute: number): Promise<void> {
+  const ip = req.headers.get("cf-connecting-ip");
+  if (!ip) return; // Not behind Cloudflare (tests, local dev): nothing meaningful to key on.
+  const window = Math.floor(Date.now() / 60_000);
+  const key = `ratelimit:${bucket}:${ip}:${window}`;
+  const used = (await getRecord<number>(env, key)) ?? 0;
+  if (used >= perMinute) {
+    throw rateLimited(`Too many ${bucket} requests from this address. Wait a minute and try again.`);
+  }
+  await putRecord(env, key, used + 1, 120);
+}
 
 const parseOrderId = (raw: string): bigint => {
   if (!/^\d+$/.test(raw)) throw badRequest("bad_order_id", "Order id must be a positive integer.");
@@ -142,11 +178,38 @@ app.get("/api/artifacts/:hash", async (c) => {
 
 app.get("/api/orders", async (c) => {
   const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 200);
-  const orders = await readOrders(c.env, limit);
+  const offset = Math.max(Number(c.req.query("offset") ?? 0) || 0, 0);
+  const address = c.req.query("address");
+  const total = await readTotalOrders(c.env);
+
+  // An address query goes through the log index rather than scanning the tail, so a user's
+  // own orders stay findable however busy the contract gets.
+  const orders =
+    address && /^0x[0-9a-fA-F]{40}$/.test(address)
+      ? await readOrdersByIds(c.env, (await readOrderIdsForAddress(c.env, address as Address)).slice(offset, offset + limit))
+      : await readOrders(c.env, limit, offset);
+
   return c.json({
     contract: coreAddress(c.env),
-    total: (await readTotalOrders(c.env)).toString(),
+    total: total.toString(),
+    returned: orders.length,
+    offset,
+    hasMore: address ? orders.length === limit : BigInt(offset + orders.length) < total,
     orders: orders.map(serialiseOrder),
+  });
+});
+
+/** The supply side: how much stake is actually available to accept a new order right now. */
+app.get("/api/operators", async (c) => {
+  const operators = await readOperators(c.env);
+  const active = operators.filter((o) => o.active);
+  const maxAvailable = active.reduce((max, o) => (BigInt(o.available) > max ? BigInt(o.available) : max), 0n);
+  return c.json({
+    count: operators.length,
+    activeCount: active.length,
+    maxAvailableStake: maxAvailable.toString(),
+    totalStake: operators.reduce((sum, o) => sum + BigInt(o.stake), 0n).toString(),
+    operators,
   });
 });
 
@@ -174,11 +237,7 @@ app.get("/api/orders/:id", async (c) => {
  */
 const certKey = (orderId: bigint, outputHash: string) => `verdict:${orderId}:${outputHash.toLowerCase()}`;
 
-async function cachedVerdict(env: Env, key: string): Promise<unknown | null> {
-  if (!env.ARTIFACTS) return null;
-  const raw = await env.ARTIFACTS.get(key);
-  return raw ? JSON.parse(raw) : null;
-}
+const cachedVerdict = (env: Env, key: string) => getRecord<unknown>(env, key);
 
 /** Returns a previously signed certificate without spending model quota. */
 app.get("/api/verify/:orderId", async (c) => {
@@ -200,6 +259,9 @@ app.post("/api/verify/:orderId", async (c) => {
     const cached = await cachedVerdict(env, cacheKey);
     if (cached) return c.json(cached);
   }
+
+  // Only unsigned work is rate limited; a cached certificate above is always served.
+  await enforceRateLimit(env, c.req.raw, "verify", 6);
 
   if (order.status !== "Delivered") {
     throw badRequest(
@@ -311,11 +373,60 @@ app.post("/api/verify/:orderId", async (c) => {
 
   // Cached against the committed output hash: a redelivery is impossible on a delivered order,
   // so this can never serve a certificate for output the contract did not commit.
-  if (cacheKey && env.ARTIFACTS) {
-    await env.ARTIFACTS.put(cacheKey, JSON.stringify(response), {expirationTtl: 60 * 60 * 24 * 30});
+  if (cacheKey) {
+    await putRecord(env, cacheKey, response, 60 * 60 * 24 * 30);
+    // Keyed by reasonHash so the proof page can find it from on-chain state alone.
+    await putRecord(
+      env,
+      `certificate:${result.reasonHash.toLowerCase()}`,
+      {signature, digest, verifierAddress, evaluatedAt, typedData: serialiseTypedData(typedData)},
+      60 * 60 * 24 * 365
+    );
   }
 
   return c.json(response);
+});
+
+/**
+ * Dry-run the verifier against a draft spec and a sample output.
+ *
+ * No chain read, no signature, no settlement. The point is that a buyer can find out their
+ * rubric is unsatisfiable before escrowing real BOT against it, which was previously only
+ * discoverable by funding an order and watching it fail.
+ */
+app.post("/api/preview", async (c) => {
+  await enforceRateLimit(c.env, c.req.raw, "preview", 12);
+
+  const body = (await c.req.json().catch(() => null)) as {jobSpec?: JobSpec; output?: string} | null;
+  const spec = body?.jobSpec;
+  const output = body?.output;
+  if (!spec?.rubric?.length || typeof output !== "string" || output.trim().length === 0) {
+    throw badRequest("bad_body", "Expected a jobSpec with a rubric and a non-empty output to judge.");
+  }
+  if (output.length > 20_000) throw badRequest("too_large", "Preview output is capped at 20000 characters.");
+
+  const result = await verify(c.env, {
+    orderId: "preview",
+    jobSpec: {...spec, modelId: modelIdOf(c.env)},
+    rubric: spec.rubric,
+    output,
+    jobSpecHash: ZERO_HASH,
+    inputHash: ZERO_HASH,
+    rubricHash: ZERO_HASH,
+    modelHash: modelHashOf(c.env),
+    outputHash: ZERO_HASH,
+  });
+
+  return c.json({
+    preview: true,
+    verdict: result.verdict,
+    scoreBps: result.scoreBps,
+    reason: result.reason,
+    rubricFindings: result.rubricFindings,
+    modelId: result.modelId,
+    provider: result.provider,
+    mocked: result.mocked,
+  });
 });
 
 // ---------------------------------------------------------------------------

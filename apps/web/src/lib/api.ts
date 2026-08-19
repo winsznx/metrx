@@ -72,7 +72,14 @@ export interface ProofResponse {
   jobSpec: JobSpec | null;
   delivery: DeliveryArtifact | null;
   reason: VerifierReason | null;
-  hashChecks: {label: string; onChain: Hex; recomputed: Hex | null; matches: boolean}[];
+  hashChecks: {label: string; onChain: Hex; recomputed: Hex | null; matches: boolean; artifactUrl: string}[];
+  certificate: {
+    signature: Hex;
+    digest: Hex;
+    verifierAddress: Address;
+    evaluatedAt: number;
+    typedData: {domain: Record<string, string | number>; types: Record<string, {name: string; type: string}[]>; primaryType: string; message: Record<string, string | number>};
+  } | null;
   timeline: TimelineEntry[];
   settlementTx: Hex | null;
   explorer: {contract: string; buyer: string; operator: string; verifier: string};
@@ -140,6 +147,19 @@ export const api = {
     request<ProofResponse>(`/api/proof/${orderId}`).then((p) => p.timeline),
 
   proofIndex: (limit = 25) => request<ProofIndexResponse>(`/api/proof?limit=${limit}`),
+
+  operators: () =>
+    request<{count: number; activeCount: number; maxAvailableStake: string; totalStake: string}>("/api/operators"),
+
+  previewVerdict: (jobSpec: JobSpec, output: string) =>
+    request<{
+      verdict: "PASS" | "FAIL";
+      scoreBps: number;
+      reason: string;
+      rubricFindings: {rubricIndex: number; satisfied: boolean; note: string}[];
+      modelId: string;
+      mocked: boolean;
+    }>("/api/preview", {method: "POST", body: JSON.stringify({jobSpec, output})}),
 };
 
 /** Reads a published artifact and parses it, or returns null when it was never published. */

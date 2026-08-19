@@ -9,8 +9,15 @@ import {
   type JobSpec,
   type VerifierReason,
 } from "@metrx/shared";
-import {coreAddress, readAiVerifier, readOrder, readOrderTimeline, serialiseOrder} from "./chain.js";
-import {getArtifact, parseArtifact} from "./artifacts.js";
+import {
+  coreAddress,
+  readAiVerifier,
+  readOrder,
+  readOrderTimeline,
+  readSettlementCertificate,
+  serialiseOrder,
+} from "./chain.js";
+import {getArtifact, getRecord, parseArtifact} from "./artifacts.js";
 import type {Env} from "./env.js";
 
 /**
@@ -33,6 +40,16 @@ export async function proofBundle(env: Env, orderId: bigint) {
     order.deliveryArtifactHash !== ZERO_HASH ? await getArtifact(env, order.deliveryArtifactHash) : null;
   const reasonRecord = order.verdictReasonHash !== ZERO_HASH ? await getArtifact(env, order.verdictReasonHash) : null;
 
+  const settlementTx = timeline.find((t) => t.event === "AIVerdictSettled")?.txHash ?? null;
+
+  // Prefer the chain: the settlement calldata carries the real certificate for every settled
+  // order, including ones this service never signed. The store is only a fallback.
+  const certificate =
+    order.verdictReasonHash === ZERO_HASH
+      ? null
+      : ((settlementTx ? await readSettlementCertificate(env, settlementTx, order) : null) ??
+        (await getRecord<Record<string, unknown>>(env, `certificate:${order.verdictReasonHash.toLowerCase()}`)));
+
   const jobSpec = specRecord ? parseArtifact<JobSpec>(specRecord) : null;
   const delivery = deliveryRecord ? parseArtifact<DeliveryArtifact>(deliveryRecord) : null;
   const reason = reasonRecord ? parseArtifact<VerifierReason>(reasonRecord) : null;
@@ -42,6 +59,8 @@ export async function proofBundle(env: Env, orderId: bigint) {
     onChain,
     recomputed,
     matches: recomputed !== null && recomputed.toLowerCase() === onChain.toLowerCase(),
+    /** Fetch the artifact and re-derive the hash yourself. */
+    artifactUrl: `/api/artifacts/${onChain}`,
   });
 
   const hashChecks = [
@@ -65,8 +84,9 @@ export async function proofBundle(env: Env, orderId: bigint) {
     delivery,
     reason,
     hashChecks,
+    certificate,
     timeline,
-    settlementTx: timeline.find((t) => t.event === "AIVerdictSettled")?.txHash ?? null,
+    settlementTx,
     explorer: {
       contract: explorerAddress(core),
       buyer: explorerAddress(order.buyer),

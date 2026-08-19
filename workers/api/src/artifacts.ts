@@ -23,6 +23,33 @@ export interface StoredArtifact {
   storedAt: number;
 }
 
+/**
+ * Generic keyed storage on the same backend chain as artifacts.
+ *
+ * Certificate caching and rate limiting previously reached for `env.ARTIFACTS` directly, so
+ * both silently did nothing whenever KV was unbound — in tests, and in any `wrangler dev`
+ * without bindings. Going through one backend keeps behaviour identical everywhere.
+ */
+export async function putRecord(env: Env, key: string, value: unknown, ttlSeconds?: number): Promise<void> {
+  const body = JSON.stringify(value);
+  if (env.ARTIFACTS_R2) await env.ARTIFACTS_R2.put(key, body);
+  else if (env.ARTIFACTS) await env.ARTIFACTS.put(key, body, ttlSeconds ? {expirationTtl: ttlSeconds} : undefined);
+  else memory.set(key, body);
+}
+
+export async function getRecord<T>(env: Env, key: string): Promise<T | null> {
+  let raw: string | null = null;
+  if (env.ARTIFACTS_R2) {
+    const object = await env.ARTIFACTS_R2.get(key);
+    raw = object ? await object.text() : null;
+  } else if (env.ARTIFACTS) {
+    raw = await env.ARTIFACTS.get(key);
+  } else {
+    raw = memory.get(key) ?? null;
+  }
+  return raw ? (JSON.parse(raw) as T) : null;
+}
+
 export function backendName(env: Env): "r2" | "kv" | "memory" {
   if (env.ARTIFACTS_R2) return "r2";
   if (env.ARTIFACTS) return "kv";
