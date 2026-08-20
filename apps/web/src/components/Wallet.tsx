@@ -15,6 +15,16 @@ export function ConnectButton({size = "md"}: {size?: "sm" | "md"}) {
   const [picking, setPicking] = useState(false);
   const hasWallet = useHasWallet();
 
+  // Dismiss the picker on Escape, matching the backdrop click-to-close.
+  useEffect(() => {
+    if (!picking) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPicking(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [picking]);
+
   // EIP-6963 makes every installed wallet its own connector. Picking connectors[0] blindly
   // meant a user with two wallets always got whichever one won the injection race.
   const wallets = connectors.filter((c) => c.type === "injected" || c.id !== "injected");
@@ -59,15 +69,44 @@ export function ConnectButton({size = "md"}: {size?: "sm" | "md"}) {
 
   if (picking && unique.length > 1) {
     return (
-      <div className="flex flex-col items-end gap-1.5">
-        {unique.map((c) => (
-          <button key={c.uid} type="button" className="btn btn-ghost text-[13px]" onClick={() => connect(c)}>
-            {c.name}
-          </button>
-        ))}
-        <button type="button" className="text-xs text-stone hover:text-ink" onClick={() => setPicking(false)}>
-          Cancel
+      <div className="flex flex-col items-end gap-2">
+        <button type="button" disabled className="btn btn-primary opacity-60">
+          Connect wallet
         </button>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Choose a wallet"
+          onClick={() => setPicking(false)}
+        >
+          <div className="card w-full max-w-sm p-5 text-left" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-lg font-medium text-ink">Connect a wallet</h2>
+              <button type="button" className="text-sm text-stone hover:text-ink" onClick={() => setPicking(false)}>
+                Close
+              </button>
+            </div>
+            <p className="mt-1 text-sm text-stone">
+              Metrx uses your browser wallet on BOT Chain Mainnet. Nothing is stored on our side.
+            </p>
+            <div className="mt-4 flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
+              {unique.map((c) => (
+                <button
+                  key={c.uid}
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl border border-ink/15 px-4 py-3 text-sm font-medium hover:border-ink/30 hover:bg-mist/40"
+                  onClick={() => connect(c)}
+                >
+                  <span>{c.name}</span>
+                  <span aria-hidden className="text-stone">
+                    →
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -79,6 +118,7 @@ export function ConnectButton({size = "md"}: {size?: "sm" | "md"}) {
         onClick={() => (unique.length > 1 ? setPicking(true) : connect(unique[0]!))}
         disabled={isPending || unique.length === 0}
         className="btn btn-primary"
+        aria-haspopup="dialog"
       >
         {isPending ? "Check your wallet…" : "Connect wallet"}
       </button>
