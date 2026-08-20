@@ -16,6 +16,7 @@ export default function Landing() {
       <Hero />
       <Problem />
       <Mechanism />
+      <WhyAiNative />
       <ProductFlow />
       <LiveProof />
       <TrustBoundary />
@@ -123,6 +124,37 @@ function Mechanism() {
       <p className="mono mt-8 text-stone">
         buyer funds → operator delivers → AI verifier signs → BOT Chain settles PAY / REFUND / SLASH
       </p>
+    </Section>
+  );
+}
+
+function WhyAiNative() {
+  return (
+    <Section className="py-20 md:py-24">
+      <div className="grid gap-12 md:grid-cols-[0.9fr_1.1fr]">
+        <div>
+          <Eyebrow>Why AI-native</Eyebrow>
+          <h2 className="headline mt-3 text-[34px] md:text-[44px]">
+            The model is the settlement authority, not a feature.
+          </h2>
+        </div>
+        <div className="space-y-5 text-[17px] leading-relaxed text-slate">
+          <p>
+            Metrx is not a chatbot with a blockchain attached. The AI verifier&apos;s signed verdict is the only thing
+            that releases escrow. Remove the model and no order can settle — the product does not degrade into a manual
+            path, it stops.
+          </p>
+          <p className="text-ink">
+            The model decides; the contract only enforces what it decided. On every order, an AI judgement is what moves
+            real BOT between a buyer and an operator.
+          </p>
+          <p>
+            The provider behind the model is swappable infrastructure. What is load-bearing is that the verdict is
+            committed on-chain, bound to one job, and worthless anywhere else — the AI is a participant in settlement,
+            not a third-party API call decorating a screen.
+          </p>
+        </div>
+      </div>
     </Section>
   );
 }
