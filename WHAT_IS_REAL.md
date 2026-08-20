@@ -17,7 +17,7 @@ Last updated: 2026-08-19.
 | Cross-language EIP-712 parity (TS signer vs Solidity recovery) | Verified against compiled bytecode on anvil |
 | Full product loop through the real API routes (fund → deliver → verify → settle → proof) | Verified on anvil, PAY and SLASH |
 | Web app — landing, onboarding checklist, buyer wizard, operator console, verifier surface, settings, proof pages | Builds, typechecks |
-| Live BOT Chain seam check | 10/12 passing, see [SEAM_REPORT.md](SEAM_REPORT.md) |
+| Live BOT Chain seam check | 12/12 passing, see [SEAM_REPORT.md](SEAM_REPORT.md) |
 | Web app deployed | Live at https://metrx.pages.dev |
 | Verifier service deployed with durable KV artifact storage | Live at https://metrx-api.timjosh507.workers.dev |
 

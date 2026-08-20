@@ -44,6 +44,14 @@ What makes the verdict auditable rather than a black box:
 - The verifier's full reasoning is published under a hash that the settlement transaction carries.
 - The certificate is bound to one order id, spec, rubric, model, and output. It is worthless anywhere else.
 
+## Why this is AI-native
+
+BOT Chain's AI track asks for AI as a core capability that drives an on-chain process — not an auxiliary feature and not a third-party API call decorating a UI. In Metrx the model is the settlement authority:
+
+- **Remove the model and the product stops.** No verdict means no signature, which means no settlement. There is no manual path it degrades into: the contract will not move escrow without a verdict signed by the verifier named at deploy time.
+- **The model decides; the chain enforces.** On every order, an AI judgement is the thing that moves real BOT between a buyer and an operator. It is not summarizing, drafting, or chatting alongside the product — it *is* the product's decision step.
+- **The provider is swappable; the binding is not.** Groq is interchangeable infrastructure. What is load-bearing is that the verdict is committed on-chain, bound to one order, rubric, model, and output, and rejected everywhere else.
+
 ## Repository layout
 
 ```
@@ -167,6 +175,18 @@ stranded by a hostile or non-standard receiver.
 **Two independent specifications.** The Foundry suite tests the contract. The TypeScript
 reference model tests the same rules written from the spec rather than from the Solidity.
 A disagreement between them is a bug report, not a matter of opinion.
+
+## Roadmap
+
+v1 is deliberately narrow: one verifier address, bounded compute jobs, native BOT. The primitive it proves — a deliverable committed up front, judged against a public rubric, and paid or refunded on-chain without anyone negotiating — is not specific to compute. The same escrow, staking, and verdict-enforcement path generalizes to real-world service agreements where an off-chain deliverable must be verified before payment, which is the RWA-services direction BOT Chain is building toward.
+
+Concrete next steps, in evidence order rather than as promises:
+
+- A decentralized verifier set. Today there is exactly one verifier address, fixed at deploy.
+- Re-execution or TEE / ZK attestation, to narrow the trust boundary from *auditable* toward *proven*.
+- Operator reputation derived from on-chain settlement history, not a separate ratings system.
+
+None of this is shipped. [WHAT_IS_REAL.md](WHAT_IS_REAL.md) draws the line between what settles today and what does not.
 
 ## Documentation
 
