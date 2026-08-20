@@ -1,5 +1,6 @@
 import {useAccount, useConnect, useDisconnect} from "wagmi";
 import {useEffect, useRef, useState} from "react";
+import {createPortal} from "react-dom";
 import {CHAIN_ID} from "@/lib/config";
 import {useBotBalance, useNetworkGate} from "@/lib/contract";
 import {isMobileBrowser, useHasWallet} from "@/lib/wallet";
@@ -73,40 +74,43 @@ export function ConnectButton({size = "md"}: {size?: "sm" | "md"}) {
         <button type="button" disabled className="btn btn-primary opacity-60">
           Connect wallet
         </button>
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Choose a wallet"
-          onClick={() => setPicking(false)}
-        >
-          <div className="card w-full max-w-sm p-5 text-left" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-lg font-medium text-ink">Connect a wallet</h2>
-              <button type="button" className="text-sm text-stone hover:text-ink" onClick={() => setPicking(false)}>
-                Close
-              </button>
-            </div>
-            <p className="mt-1 text-sm text-stone">
-              Metrx uses your browser wallet on BOT Chain Mainnet. Nothing is stored on our side.
-            </p>
-            <div className="mt-4 flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
-              {unique.map((c) => (
-                <button
-                  key={c.uid}
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl border border-ink/15 px-4 py-3 text-sm font-medium hover:border-ink/30 hover:bg-mist/40"
-                  onClick={() => connect(c)}
-                >
-                  <span>{c.name}</span>
-                  <span aria-hidden className="text-stone">
-                    →
-                  </span>
+        {createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Choose a wallet"
+            onClick={() => setPicking(false)}
+          >
+            <div className="card w-full max-w-sm p-5 text-left" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-lg font-medium text-ink">Connect a wallet</h2>
+                <button type="button" className="text-sm text-stone hover:text-ink" onClick={() => setPicking(false)}>
+                  Close
                 </button>
-              ))}
+              </div>
+              <p className="mt-1 text-sm text-stone">
+                Metrx uses your browser wallet on BOT Chain Mainnet. Nothing is stored on our side.
+              </p>
+              <div className="mt-4 flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
+                {unique.map((c) => (
+                  <button
+                    key={c.uid}
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-xl border border-ink/15 px-4 py-3 text-sm font-medium hover:border-ink/30 hover:bg-mist/40"
+                    onClick={() => connect(c)}
+                  >
+                    <span>{c.name}</span>
+                    <span aria-hidden className="text-stone">
+                      →
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
+          </div>,
+          document.body,
+        )}
       </div>
     );
   }
