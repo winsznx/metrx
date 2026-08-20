@@ -104,17 +104,66 @@ export class ApiRequestError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {"content-type": "application/json", ...(init?.headers ?? {})},
-  });
-  const text = await res.text();
-  const body = text ? JSON.parse(text) : {};
-  if (!res.ok) {
-    throw new ApiRequestError(body.error ?? "http_error", body.message ?? `HTTP ${res.status}`, res.status);
+/**
+ * `content-type` is set only when there is a body to describe. Declaring it on a GET is not
+ * merely redundant: `application/json` is outside the CORS safelist, so it forces a preflight
+ * OPTIONS on every read, which doubled the request count on page load and made reads fail in bursts.
+ *
+ * A 5xx or a dropped connection is retried with a short jittered backoff. A cold free-tier isolate
+ * that overruns its CPU budget is killed by the platform (Cloudflare 1101) before the handler runs,
+ * and that kill is transient: a retry lands on a now-warm isolate and succeeds, so it never needs to
+ * reach the UI. The jitter keeps a burst of simultaneous failures from retrying in lockstep and
+ * colliding again. A 4xx is deterministic, so it is surfaced immediately without spending a retry.
+ */
+const RETRY_BACKOFF_MS = [300, 800];
+
+const backoffFor = (attempt: number): number => {
+  const base = RETRY_BACKOFF_MS[attempt - 1] ?? RETRY_BACKOFF_MS[RETRY_BACKOFF_MS.length - 1];
+  return base + Math.floor(Math.random() * base);
+};
+
+const parseJsonObject = (text: string): Record<string, unknown> => {
+  try {
+    return text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    // A platform 1101 kill answers with a plain-text body, so parsing it as JSON must read as an
+    // empty object rather than throw a SyntaxError that masks the real status.
+    return {};
   }
-  return body as T;
+};
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const hasBody = init?.body !== undefined;
+  const headers = {...(hasBody ? {"content-type": "application/json"} : {}), ...(init?.headers ?? {})};
+
+  let lastError: unknown = new ApiRequestError("network", "The request failed before a response arrived.", 0);
+
+  for (let attempt = 0; attempt <= RETRY_BACKOFF_MS.length; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, backoffFor(attempt)));
+
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}${path}`, {...init, headers});
+    } catch (err) {
+      lastError = err;
+      continue;
+    }
+
+    if (res.status >= 500 && attempt < RETRY_BACKOFF_MS.length) {
+      lastError = new ApiRequestError("upstream", `HTTP ${res.status}`, res.status);
+      continue;
+    }
+
+    const body = parseJsonObject(await res.text());
+    if (!res.ok) {
+      const code = typeof body.error === "string" ? body.error : "http_error";
+      const message = typeof body.message === "string" ? body.message : `HTTP ${res.status}`;
+      throw new ApiRequestError(code, message, res.status);
+    }
+    return body as T;
+  }
+
+  throw lastError;
 }
 
 export const api = {
@@ -149,7 +198,13 @@ export const api = {
   proofIndex: (limit = 25) => request<ProofIndexResponse>(`/api/proof?limit=${limit}`),
 
   operators: () =>
-    request<{count: number; activeCount: number; maxAvailableStake: string; totalStake: string}>("/api/operators"),
+    request<{
+      count: number;
+      activeCount: number;
+      maxAvailableStake: string;
+      totalStake: string;
+      operators: {address: string; available: string; stake: string; slashed: string; active: boolean; metadataURI: string}[];
+    }>("/api/operators"),
 
   previewVerdict: (jobSpec: JobSpec, output: string) =>
     request<{

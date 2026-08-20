@@ -1,13 +1,14 @@
 import {useEffect, useMemo, useState} from "react";
 import {Link} from "react-router-dom";
 import {useAccount} from "wagmi";
-import {availableStake, hashJson, hashText, type DeliveryArtifact, type Order} from "@metrx/shared";
-import {api} from "@/lib/api";
+import {availableStake, hashJson, hashText, type DeliveryArtifact, type JobSpec, type Order} from "@metrx/shared";
+import {api, readArtifact} from "@/lib/api";
 import {isRegistered, useBotBalance, useMetrxWrite, useNetworkGate, useNow, useOperator, useOrders} from "@/lib/contract";
 import {botAmount, relativeDeadline, safeParseBot} from "@/lib/format";
 import {humanError, type FriendlyError} from "@/lib/errors";
 import {
   Card,
+  Chip,
   EmptyState,
   ErrorNotice,
   Eyebrow,
@@ -371,6 +372,14 @@ function JobCard({
   const tx = useMetrxWrite();
   const {wrongNetwork} = useNetworkGate();
   const enoughStake = !!profile && availableStake(profile) >= order.maxSlash;
+  const [spec, setSpec] = useState<JobSpec | null>(null);
+
+  // Deciding whether to lock stake against a job needs the job itself, not just its price.
+  useEffect(() => {
+    readArtifact<JobSpec>(order.jobSpecHash).then(setSpec);
+  }, [order.jobSpecHash]);
+
+  const ratio = order.price > 0n ? Number((order.maxSlash * 100n) / order.price) / 100 : 0;
 
   return (
     <Card className="p-5">
@@ -378,11 +387,25 @@ function JobCard({
         <span className="mono text-stone">Order #{order.id.toString()}</span>
         <StatusPill status={order.status} />
       </div>
+      <h3 className="headline mt-3 text-[18px]">{spec?.title ?? "Reading the job spec…"}</h3>
+      {spec && (
+        <p className="mt-1 line-clamp-2 text-sm text-slate">{spec.instructions}</p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {spec && <Chip>{spec.taskType}</Chip>}
+        {spec && <Chip>{spec.rubric.length} rubric rules</Chip>}
+        <Chip tone={ratio > 2 ? "warn" : "neutral"}>{ratio}× stake per BOT earned</Chip>
+      </div>
       <div className="mt-3">
-        <Row label="Escrow">{botAmount(order.price)}</Row>
-        <Row label="Stake at risk">{botAmount(order.maxSlash)}</Row>
+        <Row label="You earn">{botAmount(order.price)}</Row>
+        <Row label="You risk">{botAmount(order.maxSlash)}</Row>
         <Row label="Deliver by">{relativeDeadline(order.deliveryDeadline)}</Row>
       </div>
+      {ratio > 2 && (
+        <p className="mt-2 text-xs text-[#7a5518]">
+          This buyer is asking you to risk more than twice what the job pays.
+        </p>
+      )}
       {tx.phase === "pending" && tx.hash && (
         <p className="mt-3 text-sm text-slate">
           Waiting for confirmation · <TxLink hash={tx.hash} />

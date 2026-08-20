@@ -96,6 +96,7 @@ export default function OrderDetail() {
         <>
           <Card className="mt-8 p-7">
             <Timeline order={order.data} />
+            <p className="mt-5 border-t border-ink/10 pt-4 text-sm text-slate">{whatHappensNext(order.data, now)}</p>
           </Card>
 
           <div className="mt-4">
@@ -340,6 +341,27 @@ function ActionPanel({
       )}
     </Card>
   );
+}
+
+/** Plain language for where this order stands and who has to move next. */
+function whatHappensNext(order: NonNullable<ReturnType<typeof useOrder>["data"]>, now: number): string {
+  const past = (d: bigint) => now > Number(d);
+  switch (order.status) {
+    case "Funded":
+      return past(order.deliveryDeadline)
+        ? "No operator took this job before the deadline, so the escrow is yours to reclaim. Anyone can close it."
+        : `Waiting for an operator to stake and accept. If nobody does by ${relativeDeadline(order.deliveryDeadline, now)}, you get the full escrow back.`;
+    case "Accepted":
+      return past(order.deliveryDeadline)
+        ? "The operator missed the delivery deadline. Closing this order refunds you the escrow plus their slashed stake."
+        : `An operator has committed and is running the job. They must deliver ${relativeDeadline(order.deliveryDeadline, now)} or lose their stake to you.`;
+    case "Delivered":
+      return past(order.verificationDeadline)
+        ? "The output was delivered but no verdict arrived in time, so the escrow returns to you and the operator's stake is released."
+        : `The output is in. Someone now has to run the AI verifier — you, the operator, or anyone else — before ${relativeDeadline(order.verificationDeadline, now)}. Nothing settles on its own.`;
+    default:
+      return "This order is finished. The public proof page shows every step and the transaction that enforced it.";
+  }
 }
 
 const settlementWord = (status: string) =>

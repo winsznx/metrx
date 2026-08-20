@@ -101,8 +101,9 @@ export default function Verify() {
       </div>
 
       <p className="mt-4 text-[17px] leading-relaxed text-slate">
-        The verifier reads the job spec, the buyer's rubric, and the operator's committed output, then signs an EIP-712
-        certificate. Anyone can submit that certificate. The contract recovers the signature and enforces the result.
+        An AI reads the job, the buyer's rules, and exactly what the operator delivered, then decides whether it passes.
+        Its decision is signed, so the contract will only act on this one verdict for this one order. Anyone can submit
+        it — you do not have to be the buyer or the operator.
       </p>
 
       <div className="mt-8 space-y-4">
@@ -281,45 +282,52 @@ export default function Verify() {
                 )}
 
                 <div className="mt-6">
-                  <Eyebrow>Signed certificate</Eyebrow>
-                  <div className="mt-2">
-                    <Row label="Signed by">
-                      <AddressLink address={verdict.verifierAddress} />
-                    </Row>
-                    <Row label="Model">
-                      <span className="mono">{verdict.modelId}</span>
-                    </Row>
-                    <Row label="Provider">
-                      {verdict.provider}
-                      {verdict.mocked ? " (mock)" : ""}
-                    </Row>
-                    {verdict.rateLimit?.requestsRemaining && (
-                      <Row label="Provider quota left">
-                        {verdict.rateLimit.requestsRemaining} requests
-                        {verdict.rateLimit.tokensRemaining ? `, ${verdict.rateLimit.tokensRemaining} tokens` : ""}
-                      </Row>
-                    )}
-                    <Row label="Evaluated at">{timestamp(verdict.evaluatedAt)}</Row>
-                    <Row label="reasonHash">
-                      <Mono value={verdict.reasonHash} />
-                    </Row>
-                    <Row label="EIP-712 digest">
-                      <Mono value={verdict.digest} />
-                    </Row>
-                    <Row label="Signature">
-                      <Mono value={verdict.signature} lead={12} tail={8} />
-                    </Row>
-                  </div>
-                </div>
+                  <p className="text-[15px] text-ink">
+                    {verdict.verdict === "PASS"
+                      ? `The AI approved this delivery. Settling releases ${botAmount(order.data.price)} to the operator.`
+                      : `The AI rejected this delivery. Settling returns ${botAmount(order.data.price)} to the buyer plus the operator's ${botAmount(order.data.maxSlash)} stake.`}
+                  </p>
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-sm text-slate hover:text-ink">
+                      Show the cryptographic proof
+                    </summary>
+                    <div className="mt-3">
+                      <Eyebrow>Signed certificate</Eyebrow>
+                      <div className="mt-2">
+                        <Row label="Signed by">
+                          <AddressLink address={verdict.verifierAddress} />
+                        </Row>
+                        <Row label="Model">
+                          <span className="mono">{verdict.modelId}</span>
+                        </Row>
+                        <Row label="Provider">
+                          {verdict.provider}
+                          {verdict.mocked ? " (mock)" : ""}
+                        </Row>
+                        {verdict.rateLimit?.requestsRemaining && (
+                          <Row label="Provider quota left">
+                            {verdict.rateLimit.requestsRemaining} requests
+                            {verdict.rateLimit.tokensRemaining ? `, ${verdict.rateLimit.tokensRemaining} tokens` : ""}
+                          </Row>
+                        )}
+                        <Row label="Evaluated at">{timestamp(verdict.evaluatedAt)}</Row>
+                        <Row label="reasonHash">
+                          <Mono value={verdict.reasonHash} />
+                        </Row>
+                        <Row label="EIP-712 digest">
+                          <Mono value={verdict.digest} />
+                        </Row>
+                        <Row label="Signature">
+                          <Mono value={verdict.signature} lead={12} tail={8} />
+                        </Row>
+                      </div>
 
-                <details className="mt-5">
-                  <summary className="cursor-pointer text-sm text-slate hover:text-ink">
-                    Show the raw typed data the verifier signed
-                  </summary>
-                  <pre className="mono mt-3 overflow-x-auto rounded-xl bg-mist/45 p-4 text-[12px] leading-relaxed">
-                    {JSON.stringify(verdict.typedData, null, 2)}
-                  </pre>
-                </details>
+                      <pre className="mono mt-4 overflow-x-auto rounded-xl bg-mist/45 p-4 text-[12px] leading-relaxed">
+                        {JSON.stringify(verdict.typedData, null, 2)}
+                      </pre>
+                    </div>
+                  </details>
+                </div>
               </Card>
 
               <Card className="mt-4 p-7">

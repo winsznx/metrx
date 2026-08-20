@@ -2,7 +2,7 @@ import {useEffect, useMemo, useState} from "react";
 import {Link, useNavigate} from "react-router-dom";
 import {useAccount} from "wagmi";
 import {decodeEventLog} from "viem";
-import {hashJson, hashText, type JobSpec} from "@metrx/shared";
+import {explorerAddress, hashJson, hashText, type JobSpec} from "@metrx/shared";
 import {api, type VerifierConfig} from "@/lib/api";
 import {coreAbi, useBotBalance, useMetrxWrite, useNetworkGate} from "@/lib/contract";
 import {botAmount, inSeconds, safeParseBot, timestamp} from "@/lib/format";
@@ -27,6 +27,21 @@ import {usePublicClient} from "wagmi";
 import {CORE_ADDRESS} from "@/lib/config";
 
 const DRAFT_KEY = "create";
+
+const EXAMPLE = {
+  title: "Summarize a support ticket",
+  instructions:
+    "Summarize this support ticket into exactly 3 action items. Do not invent facts that are not in the ticket.",
+  input:
+    "Customer says their October invoice was charged twice. They already emailed support once with no reply. They are asking for a refund of the duplicate charge and want confirmation by Friday.",
+  rubric: [
+    "Output must contain exactly 3 action items",
+    "Output must mention the duplicate charge refund request",
+    "Output must not invent facts absent from the ticket",
+  ],
+};
+
+const BLANK = {title: "", instructions: "", input: "", rubric: [""]};
 
 interface Draft {
   title: string;
@@ -68,25 +83,28 @@ export default function Create() {
 
   const [step, setStep] = useState<Step>("Task");
   const [config, setConfig] = useState<VerifierConfig | null>(null);
-  const [supply, setSupply] = useState<{count: number; activeCount: number; maxAvailableStake: string} | null>(null);
+  const [supply, setSupply] = useState<Awaited<ReturnType<typeof api.operators>> | null>(null);
   const [configError, setConfigError] = useState<FriendlyError | null>(null);
 
-  const [title, setTitle] = useState(restored?.title ?? "Summarize a support ticket");
-  const [instructions, setInstructions] = useState(
-    restored?.instructions ??
-      "Summarize this support ticket into exactly 3 action items. Do not invent facts that are not in the ticket."
-  );
-  const [input, setInput] = useState(
-    restored?.input ??
-      "Customer says their October invoice was charged twice. They already emailed support once with no reply. They are asking for a refund of the duplicate charge and want confirmation by Friday."
-  );
-  const [rubric, setRubric] = useState<string[]>(
-    restored?.rubric ?? [
-      "Output must contain exactly 3 action items",
-      "Output must mention the duplicate charge refund request",
-      "Output must not invent facts absent from the ticket",
-    ]
-  );
+  const [title, setTitle] = useState(restored?.title ?? EXAMPLE.title);
+  const [instructions, setInstructions] = useState(restored?.instructions ?? EXAMPLE.instructions);
+  const [input, setInput] = useState(restored?.input ?? EXAMPLE.input);
+  const [rubric, setRubric] = useState<string[]>(restored?.rubric ?? EXAMPLE.rubric);
+  /** True while the form still holds the untouched example, so it is never mistaken for real work. */
+  const isExample =
+    !restored &&
+    title === EXAMPLE.title &&
+    instructions === EXAMPLE.instructions &&
+    input === EXAMPLE.input &&
+    JSON.stringify(rubric) === JSON.stringify(EXAMPLE.rubric);
+
+  const startBlank = () => {
+    setTitle(BLANK.title);
+    setInstructions(BLANK.instructions);
+    setInput(BLANK.input);
+    setRubric(BLANK.rubric);
+    setStep("Task");
+  };
 
   const [price, setPrice] = useState(restored?.price ?? "0.02");
   const [maxSlash, setMaxSlash] = useState(restored?.maxSlash ?? "0.01");
@@ -266,6 +284,23 @@ export default function Create() {
         </DeployGate>
       </div>
 
+      {isExample && (
+        <div className="mt-6">
+          <Notice
+            tone="warn"
+            title="This is a filled-in example, not your job"
+            action={
+              <button type="button" className="btn btn-primary" onClick={startBlank}>
+                Start blank
+              </button>
+            }
+          >
+            Every field below is sample text so you can see the shape of a real order and test the rubric preview.
+            Replace it with your own work before funding — this order would escrow real BOT against this example.
+          </Notice>
+        </div>
+      )}
+
       {draftRestored && (
         <div className="mt-6">
           <Notice
@@ -401,6 +436,33 @@ export default function Create() {
                     smaller pool of operators who can take the job.
                   </p>
                 )}
+                {supply.operators.filter((o) => o.active).length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {supply.operators
+                      .filter((o) => o.active)
+                      .slice(0, 4)
+                      .map((o) => (
+                        <li key={o.address} className="flex flex-wrap items-baseline gap-x-2">
+                          <a
+                            className="mono text-ink underline underline-offset-2"
+                            href={explorerAddress(o.address)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {o.address.slice(0, 8)}…{o.address.slice(-4)}
+                          </a>
+                          <span className="text-stone">
+                            {botAmount(BigInt(o.available))} free of {botAmount(BigInt(o.stake))} staked
+                            {BigInt(o.slashed) > 0n ? `, ${botAmount(BigInt(o.slashed))} slashed to date` : ", never slashed"}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+                <p className="mt-2 text-stone">
+                  Stake and slash history are the only signals Metrx has today. There is no reputation score, no
+                  ratings, and no matching — an operator with free stake may still simply not take your job.
+                </p>
               </Notice>
             )}
             {overCollateralised && (
@@ -559,10 +621,21 @@ export default function Create() {
                     to find it. Do not fund again.
                   </p>
                 )}
-                <p className="mt-2 text-ink">
-                  What happens next: an operator accepts and delivers, then anyone runs the AI verifier from the order
-                  page to settle it. Nothing settles on its own, so check back.
-                </p>
+                <div className="mt-3 rounded-xl bg-paper/70 p-3">
+                  <p className="text-ink">What happens next</p>
+                  <ol className="mt-1 space-y-1">
+                    <li>1. An operator stakes and accepts your order, then delivers their output.</li>
+                    <li>
+                      2. You come back and run the AI verifier from the order page. Nothing settles on its own — a
+                      person has to trigger it.
+                    </li>
+                    <li>3. The verdict releases your escrow to the operator, or refunds you plus their slashed stake.</li>
+                  </ol>
+                  <p className="mt-2 text-stone">
+                    If nobody delivers by your deadline, or no verdict lands by the verification deadline, you get your
+                    BOT back automatically — you just have to close the order.
+                  </p>
+                </div>
               </Notice>
             ) : (
               <>

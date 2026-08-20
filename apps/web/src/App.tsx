@@ -16,7 +16,11 @@ import {Architecture, Security, WhatIsReal} from "@/routes/Docs";
 
 function ScrollToTop() {
   const {pathname} = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  // Block body on purpose: a concise arrow returns whatever scrollTo returns, and React treats
+  // any non-undefined return as a cleanup function. That crashed the entire tree on every route.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return null;
 }
 
