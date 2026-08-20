@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Source for public/og.png (the social preview card). Regenerate with:
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+          --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+          --screenshot=apps/web/public/og.png --window-size=1200,630 \
+          --virtual-time-budget=4000 file://$PWD/apps/web/scripts/og.html
+      Design tokens mirror apps/web/src/styles/index.css so the card reads as part of the product.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #141311;
+        --paper: #f7f1e8;
+        --mist: #e7ddd0;
+        --bot: #14c79a;
+        --slate: #4b5563;
+        --stone: #8a8178;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1200px;
+        height: 630px;
+      }
+      body {
+        background: var(--paper);
+        color: var(--ink);
+        font-family: "Inter", system-ui, -apple-system, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        position: relative;
+        overflow: hidden;
+      }
+      /* Hairline frame, echoing the card system (borders, never shadows). */
+      .frame {
+        position: absolute;
+        inset: 26px;
+        border-radius: 26px;
+        border: 1px solid color-mix(in srgb, var(--ink) 11%, transparent);
+      }
+      /* A single wash of settlement green in the corner — the only saturation on the canvas. */
+      .glow {
+        position: absolute;
+        right: -160px;
+        bottom: -220px;
+        width: 620px;
+        height: 620px;
+        border-radius: 999px;
+        background: radial-gradient(circle, color-mix(in srgb, var(--bot) 18%, transparent), transparent 70%);
+      }
+      .stage {
+        position: absolute;
+        inset: 0;
+        padding: 80px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .wordmark {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        font-size: 31px;
+        font-weight: 500;
+        letter-spacing: -0.02em;
+      }
+      .mark {
+        color: var(--bot);
+        font-size: 33px;
+        line-height: 1;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid color-mix(in srgb, var(--ink) 15%, transparent);
+        border-radius: 999px;
+        padding: 10px 20px;
+        font-size: 17px;
+        font-weight: 500;
+        color: var(--slate);
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--bot);
+      }
+      .eyebrow {
+        font-size: 18px;
+        font-weight: 500;
+        letter-spacing: 0.17em;
+        text-transform: uppercase;
+        color: var(--stone);
+      }
+      .headline {
+        margin-top: 24px;
+        font-size: 76px;
+        font-weight: 500;
+        line-height: 1.03;
+        letter-spacing: -0.038em;
+        max-width: 1010px;
+        color: var(--ink);
+      }
+      .flow {
+        font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 19px;
+        letter-spacing: -0.02em;
+        color: var(--slate);
+        white-space: nowrap;
+      }
+      .flow b {
+        color: var(--bot);
+        font-weight: 500;
+      }
+      .url {
+        font-family: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+        font-size: 18px;
+        color: var(--stone);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="glow"></div>
+    <div class="frame"></div>
+    <div class="stage">
+      <div class="row">
+        <div class="wordmark"><span class="mark">✶</span> Metrx</div>
+        <div class="pill"><span class="dot"></span> BOT Chain Mainnet</div>
+      </div>
+      <div>
+        <div class="eyebrow">AI-native compute settlement</div>
+        <div class="headline">Compute delivery should settle, not depend on trust.</div>
+      </div>
+      <div class="row">
+        <div class="flow">buyer funds → operator delivers → AI verifier signs → <b>BOT Chain settles</b></div>
+        <div class="url">metrx.pages.dev</div>
+      </div>
+    </div>
+  </body>
+</html>
