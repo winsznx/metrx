@@ -73,10 +73,12 @@ export default function Settings() {
           </button>
           {cleared && <span className="text-sm text-deep">Cleared.</span>}
         </div>
-        <Notice tone="neutral" title="Disconnecting does not touch your orders">
-          Orders live in the contract, not in this browser. Escrow, stake and deadlines are unaffected by disconnecting
-          or clearing drafts.
-        </Notice>
+        <div className="mt-6">
+          <Notice tone="neutral" title="Disconnecting does not touch your orders">
+            Orders live in the contract, not in this browser. Escrow, stake and deadlines are unaffected by disconnecting
+            or clearing drafts.
+          </Notice>
+        </div>
       </Card>
 
       <Card className="mt-4 p-7">
