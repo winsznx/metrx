@@ -35,7 +35,11 @@ export default function Settings() {
             <Row label="Network">{wrongNetwork ? `Chain ${chainId} — not BOT Chain` : "BOT Chain Mainnet · 677"}</Row>
             <Row label="Balance">{botAmount(balance)}</Row>
             <div className="mt-5">
-              <button type="button" className="btn btn-ghost" onClick={() => disconnect()}>
+              <button
+                type="button"
+                className="btn border border-clay/30 text-clay hover:border-clay/50 hover:bg-clay/10"
+                onClick={() => disconnect()}
+              >
                 Disconnect wallet
               </button>
             </div>
