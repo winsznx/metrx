@@ -1,4 +1,5 @@
 import {useCallback, useEffect, useState, useSyncExternalStore} from "react";
+import {useAccount} from "wagmi";
 
 /**
  * Wallet facts wagmi cannot tell us.
@@ -16,29 +17,46 @@ type Provider = {
 
 const injected = (): Provider | undefined => (globalThis as {ethereum?: Provider}).ethereum;
 
-/** The chain the wallet is really on, or null when there is no wallet or it is not connected. */
+/**
+ * The chain the *connected* wallet is really on, or null when disconnected.
+ *
+ * Reading `window.ethereum` was wrong with more than one wallet installed: EIP-6963 lets several
+ * extensions inject, and whichever won the `window.ethereum` race could be a different wallet, on a
+ * different chain, than the one wagmi actually connected — so the banner reported that stray wallet's
+ * chain (e.g. Ethereum 1) while the connected wallet sat on BOT Chain. Read from the connected
+ * connector's own provider, and listen for `chainChanged` on that same provider.
+ */
 export function useWalletChainId(): number | null {
+  const {connector, isConnected} = useAccount();
   const [chainId, setChainId] = useState<number | null>(null);
 
   useEffect(() => {
-    const provider = injected();
-    if (!provider) return;
+    if (!isConnected || !connector?.getProvider) {
+      setChainId(null);
+      return;
+    }
     let cancelled = false;
-
-    const read = () =>
-      provider
-        .request({method: "eth_chainId"})
-        .then((hex) => !cancelled && setChainId(Number(hex)))
-        .catch(() => !cancelled && setChainId(null));
-
-    read();
+    let provider: Provider | undefined;
     const onChainChanged = (hex: unknown) => setChainId(Number(hex));
-    provider.on?.("chainChanged", onChainChanged);
+
+    connector
+      .getProvider()
+      .then((p) => {
+        if (cancelled) return undefined;
+        provider = p as Provider;
+        provider.on?.("chainChanged", onChainChanged);
+        return provider.request({method: "eth_chainId"});
+      })
+      .then((hex) => {
+        if (!cancelled && hex !== undefined) setChainId(Number(hex));
+      })
+      .catch(() => !cancelled && setChainId(null));
+
     return () => {
       cancelled = true;
-      provider.removeListener?.("chainChanged", onChainChanged);
+      provider?.removeListener?.("chainChanged", onChainChanged);
     };
-  }, []);
+  }, [connector, isConnected]);
 
   return chainId;
 }

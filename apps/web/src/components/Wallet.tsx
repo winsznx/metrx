@@ -272,6 +272,7 @@ export function AccountChangeBanner() {
 export function WalletSummary() {
   const {address, isConnected} = useAccount();
   const balance = useBotBalance();
+  const {wrongNetwork, chainId} = useNetworkGate();
   if (!isConnected || !address) return null;
 
   return (
@@ -282,7 +283,9 @@ export function WalletSummary() {
       <span className="text-stone">
         Balance <span className="text-ink">{botAmount(balance)}</span>
       </span>
-      <span className="pill border border-ink/15 text-slate">BOT Mainnet · 677</span>
+      <span className={`pill border ${wrongNetwork ? "border-clay/40 text-clay" : "border-ink/15 text-slate"}`}>
+        {wrongNetwork ? `Chain ${chainId} · not BOT` : "BOT Mainnet · 677"}
+      </span>
     </div>
   );
 }
