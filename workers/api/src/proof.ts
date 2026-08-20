@@ -17,7 +17,7 @@ import {
   readSettlementCertificate,
   serialiseOrder,
 } from "./chain.js";
-import {getArtifact, getRecord, parseArtifact} from "./artifacts.js";
+import {getArtifact, getRecord, parseArtifact, putRecord} from "./artifacts.js";
 import type {Env} from "./env.js";
 
 /**
@@ -27,7 +27,29 @@ import type {Env} from "./env.js";
  * page can show whether the artifact anyone can download is the artifact that was actually
  * settled against. A missing artifact is reported as missing, never silently skipped.
  */
+const TERMINAL = ["Paid", "Refunded", "Slashed", "Cancelled"];
+
+/**
+ * A settled order's evidence is immutable, so it is assembled once and served from cache.
+ *
+ * Assembling costs a log scan, a transaction decode and seven keccak hashes. That is fine for
+ * one reader and not fine for a judge's page under load: the worker exceeded its CPU budget and
+ * threw under concurrency, which surfaced in the browser as a CORS failure. Terminal orders are
+ * exactly the ones people re-read, so caching them removes the cost where it actually lands.
+ */
 export async function proofBundle(env: Env, orderId: bigint) {
+  const cacheKey = `proof:${coreAddress(env).toLowerCase()}:${orderId}`;
+  const cached = await getRecord<Record<string, unknown>>(env, cacheKey).catch(() => null);
+  if (cached) return cached;
+
+  const bundle = await assembleProofBundle(env, orderId);
+  if (TERMINAL.includes(String((bundle.order as Record<string, unknown>).status))) {
+    await putRecord(env, cacheKey, bundle, 60 * 60 * 24 * 365).catch(() => undefined);
+  }
+  return bundle;
+}
+
+async function assembleProofBundle(env: Env, orderId: bigint) {
   const [order, aiVerifier, timeline] = await Promise.all([
     readOrder(env, orderId),
     readAiVerifier(env),

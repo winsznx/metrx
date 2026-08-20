@@ -16,6 +16,14 @@ export interface VerdictCertificate {
   evaluatedAt: number;
 }
 
+/**
+ * Deriving an account from a private key runs a secp256k1 point multiplication. Config,
+ * every signature and every re-verification hits this, so the result is memoised per key.
+ * The derivation is pure and an isolate only ever holds one verifier key, so repeating it on
+ * every request was pure CPU cost — the dominant one on the otherwise-cheap config path.
+ */
+const accountCache = new Map<string, ReturnType<typeof privateKeyToAccount>>();
+
 export function verifierAccount(env: Env) {
   const pk = (env.AI_VERIFIER_PRIVATE_KEY || "").trim();
   if (!/^0x[0-9a-fA-F]{64}$/.test(pk)) {
@@ -24,7 +32,12 @@ export function verifierAccount(env: Env) {
       "AI_VERIFIER_PRIVATE_KEY is not configured on this worker, so no verdict can be signed."
     );
   }
-  return privateKeyToAccount(pk as Hex);
+  let account = accountCache.get(pk);
+  if (!account) {
+    account = privateKeyToAccount(pk as Hex);
+    accountCache.set(pk, account);
+  }
+  return account;
 }
 
 const verdictCode = (v: "PASS" | "FAIL") => (v === "PASS" ? VERDICT_PASS : VERDICT_FAIL);

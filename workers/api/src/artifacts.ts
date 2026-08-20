@@ -39,15 +39,21 @@ export async function putRecord(env: Env, key: string, value: unknown, ttlSecond
 
 export async function getRecord<T>(env: Env, key: string): Promise<T | null> {
   let raw: string | null = null;
-  if (env.ARTIFACTS_R2) {
-    const object = await env.ARTIFACTS_R2.get(key);
-    raw = object ? await object.text() : null;
-  } else if (env.ARTIFACTS) {
-    raw = await env.ARTIFACTS.get(key);
-  } else {
-    raw = memory.get(key) ?? null;
+  try {
+    if (env.ARTIFACTS_R2) {
+      const object = await env.ARTIFACTS_R2.get(key);
+      raw = object ? await object.text() : null;
+    } else if (env.ARTIFACTS) {
+      raw = await env.ARTIFACTS.get(key);
+    } else {
+      raw = memory.get(key) ?? null;
+    }
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    // A cache is never worth an outage. A truncated or unreadable entry reads as a miss, and
+    // the caller recomputes; an unguarded JSON.parse here took an endpoint down permanently.
+    return null;
   }
-  return raw ? (JSON.parse(raw) as T) : null;
 }
 
 export function backendName(env: Env): "r2" | "kv" | "memory" {

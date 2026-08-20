@@ -39,10 +39,31 @@ app.use("*", (c, next) =>
   })(c, next)
 );
 
+/**
+ * Error responses carry their own CORS header.
+ *
+ * The cors middleware decorates the response only after the handler returns, so a thrown
+ * ApiError produced a reply with no `Access-Control-Allow-Origin`. The browser then refused to
+ * read the body and surfaced an opaque CORS failure, which meant every carefully worded API
+ * error — unknown order, rate limited, artifact missing — reached users as "network did not
+ * respond".
+ */
+/** Built fresh rather than mutated: a Response's headers can be immutable, and throwing while
+ *  handling an error turns a clean 404 into an opaque worker crash. */
+const errorResponse = (env: Env, status: number, body: {error: string; message: string}): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=UTF-8",
+      "access-control-allow-origin":
+        env.ALLOWED_ORIGIN && env.ALLOWED_ORIGIN !== "*" ? env.ALLOWED_ORIGIN.split(",")[0]! : "*",
+    },
+  });
+
 app.onError((err, c) => {
-  if (err instanceof ApiError) return c.json({error: err.code, message: err.message}, err.status as 400);
-  console.error("unhandled", err);
-  return c.json({error: "internal", message: err.message ?? "Unexpected worker error."}, 500);
+  if (err instanceof ApiError) return errorResponse(c.env, err.status, {error: err.code, message: err.message});
+  console.error("unhandled", err?.stack ?? String(err));
+  return errorResponse(c.env, 500, {error: "internal", message: err?.message ?? "Unexpected worker error."});
 });
 
 /**
@@ -76,15 +97,26 @@ const parseOrderId = (raw: string): bigint => {
 app.get("/api/health", (c) => c.json({ok: true, service: "metrx-api"}));
 
 /**
- * Everything the web app needs to build an order that this verifier is able to judge —
- * in particular the model id, whose hash the buyer commits on-chain at creation time.
+ * Everything the web app needs to build an order this verifier can judge, in particular the
+ * model id whose hash the buyer commits on-chain at creation time.
+ *
+ * Cached briefly because it is the one endpoint every page load hits. On a cold isolate the two
+ * viem `eth_call`s below overrun the free-tier CPU budget, and Cloudflare kills the isolate with
+ * a 1101 before any handler try/catch can run. That is the same cost that makes the uncached read
+ * endpoints flake under a burst while the cached proof bundles never do, so a short-lived snapshot
+ * turns the common path into a cheap KV read.
  */
 app.get("/api/config", async (c) => {
   const env = c.env;
+  const cacheKey = `config:${(env.METRX_CORE_ADDRESS || "none").toLowerCase()}:${env.BOT_CHAIN_ID || 677}`;
+  const cached = await getRecord<Record<string, unknown>>(env, cacheKey);
+  if (cached) return c.json(cached);
+
   const provider = resolveProvider(env);
   let verifierAddress: Address | null = null;
   let onChainVerifier: Address | null = null;
   let totalOrders = "0";
+  let chainReadOk = false;
 
   try {
     verifierAddress = verifierAccount(env).address;
@@ -94,11 +126,12 @@ app.get("/api/config", async (c) => {
   try {
     onChainVerifier = await readAiVerifier(env);
     totalOrders = (await readTotalOrders(env)).toString();
+    chainReadOk = true;
   } catch {
     onChainVerifier = null;
   }
 
-  return c.json({
+  const payload = {
     chainId: Number(env.BOT_CHAIN_ID || 677),
     contract: /^0x[0-9a-fA-F]{40}$/.test(env.METRX_CORE_ADDRESS || "") ? env.METRX_CORE_ADDRESS : null,
     totalOrders,
@@ -117,7 +150,14 @@ app.get("/api/config", async (c) => {
       schemaEnforced: provider === "groq" && /^openai\/gpt-oss-/.test(modelIdOf(env)),
     },
     artifactStore: backendName(env),
-  });
+  };
+
+  // Only a complete snapshot is cached, so a transient RPC failure is never pinned for the window.
+  // The window outlives a browsing session so repeat page loads stay on the cheap KV read; the only
+  // field that goes stale is the displayed order count.
+  if (chainReadOk) await putRecord(env, cacheKey, payload, 300).catch(() => undefined);
+
+  return c.json(payload);
 });
 
 // ---------------------------------------------------------------------------
