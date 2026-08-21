@@ -1,134 +1,96 @@
 # Demo script
 
-About four minutes, one browser, no terminal. The point of the walkthrough is that a judge
-watches money move on BOT Chain Mainnet because an AI said so, and can check every step
-afterwards without trusting the video.
-
-Budget four minutes, not three: two of the beats wait on real mainnet transactions, and the
-waiting is the proof — do not rush or cut it.
+~3–4 minutes, two browser profiles, no terminal. A judge watches money move on BOT Chain
+because an AI said so, then verifies it with no wallet. **SAY** lines are deliberately short —
+read them, don't pad. **DO** lines are exact clicks.
 
 ---
 
-## Before you record (prep)
+## Before you record
 
-- **Buyer wallet** with a small BOT balance, already switched to **chain 677** so the
-  wrong-network banner never appears on camera.
-- **Operator in a second browser profile**, not a second account in the same wallet. Switching
-  accounts inside one extension mid-recording is the easiest thing to fumble. The operator is
-  **already registered with stake locked**, so the only operator action on camera is accepting.
-- Confirm the two pre-settled orders are live: **[#2 PAID](https://metrx.pages.dev/proof/2)** and
-  **[#3 SLASHED](https://metrx.pages.dev/proof/3)**. #3 is the failure case — you will not run a
-  second job live.
-- A third tab on **/proof with no wallet connected**.
-- Do one dry run. Mainnet finality varies; know roughly how long a confirm takes today.
+- **Two browser profiles.** Profile A = **buyer** wallet (~0.07 BOT). Profile B = **operator**
+  wallet (~0.03 BOT), already registered + staked. Split from your 0.1 BOT wallet, or reuse your
+  earlier operator `0x0f4c…624e` (already staked → skip funding).
+- Pre-stake the operator: Profile B → `/app/operator` → **Register with … BOT** (`0.01` is plenty).
+- Both profiles on **chain 677** so the wrong-network banner never shows.
+- Confirm `/proof/2` (PAID) and `/proof/3` (SLASHED) load.
+- A third tab on `/proof`, **no wallet connected**.
+- One dry run — know how long a mainnet confirm takes today. Never cut a confirmation on camera.
 
 ---
 
-## 0:00 — the claim (25s)
+## 0:00 — the claim (20s)
 
-Land on `/`.
+**DO:** Land on `/`. Scroll once to the trust-boundary section.
+**SAY:** "Compute happens off-chain; payment disputes happen in DMs. Metrx settles the last step
+on-chain — fund, deliver, an AI verifier signs a verdict, BOT Chain enforces PAY, REFUND, or SLASH."
+**SAY (the honest line):** "It's auditable AI adjudication enforced by settlement — not proof the
+compute ran."
 
-> "Compute jobs happen off-chain. Payment disputes happen in DMs. Metrx moves the last step
-> on-chain: a buyer funds a job, an operator delivers, and an AI verifier signs a verdict
-> that BOT Chain enforces as PAY, REFUND, or SLASH."
+## 0:20 — fund a job · Profile A / buyer (55s)
 
-Scroll to the trust-boundary section and read one line out loud:
+**DO:** Click **Launch app** → you're on `/app`. Go to **Create compute order** (`/app/create`).
+The form is pre-filled with an example. Edit the **Title** to your own (this clears the example
+banner); leave the 3 rubric rules.
+**DO:** Click **Continue** to **Rubric**.
+**SAY:** "These three rules are exactly what the AI judges — fixed before any operator sees it."
+**DO:** **Continue** to **Terms**. Set **Price** `0.01` and **Max slash in BOT** `0.005`, pick
+**Delivery deadline** = 30 minutes. **Continue** to **Review**.
+**SAY:** "Spec, input, rubric, and verifier model all hash-commit on-chain before a single BOT moves."
+**DO:** Connect the buyer wallet, click **Fund**. Let the tx confirm. It lands on the order page
+(`/app/orders/…`).
 
-> "This is publicly auditable AI adjudication enforced by settlement. It is not proof that
-> the compute happened."
+## 1:15 — deliver · Profile B / operator (40s)
 
-Saying the limitation before anyone asks is the whole positioning.
+**DO:** Switch to Profile B. Go to `/app/operator`. Under **Open funded jobs**, find the order →
+click **Accept job**. Confirm the tx.
+**SAY:** "Second wallet, the operator — it staked BOT to take work. It's me here; watch why that
+doesn't matter."
+**DO:** Under **Your active work**, paste a good result into **Your output**. Point at the
+`outputHash` that appears.
+**SAY:** "The output commits on-chain before the verifier ever sees it."
+**DO:** Click **Submit delivery**. Confirm the tx.
 
-## 0:25 — fund a job (60s)
+## 1:55 — the verdict · Profile A / buyer (55s)
 
-`Launch app` → `Create compute order`. Connect the buyer wallet.
+**DO:** Back in Profile A on the order page, click the primary button **Run the AI verifier**
+(opens `/app/verify/…`). Click **Run the AI verifier**.
+**SAY (while it runs — the AI-native line):** "The model isn't answering a question. Its signed
+verdict is the only thing that releases escrow — remove it and nothing settles."
+**DO:** When it lands, show in order: the **Verdict** `PASS` + score, the reason text, then the
+**Signed certificate** block — **Signed by**, **Model**, **Signature** — and expand the raw
+**typed data** for one second.
+**DO:** Under **Settle on-chain**, click **Submit verdict on-chain**. Confirm the tx.
+**SAY:** "Escrow just moved to the operator — and I couldn't have forced that. Only the signature did."
 
-Walk the four steps quickly, pausing on two:
+## 2:50 — the failure case · no wallet (35s)
 
-- **Rubric.** "These three rules are exactly what the AI verifier will judge against. Nothing
-  else." Point out that they are fixed before any operator sees the job.
-- **Review.** "These hashes go on-chain. The spec, the input, the rubric, and the verifier
-  model are all committed before a single BOT moves."
+**DO:** New tab → `/proof/3` (pre-settled SLASHED). Show the **AI verdict FAIL** reason, then the
+outcome: buyer refunded the escrow **plus** the operator's slashed stake.
+**SAY:** "Same contract, same verifier, opposite outcome. Nobody negotiated."
 
-Fund. Let the transaction confirm on screen — do not cut it — and show the order page opening
-on its own.
+## 3:25 — the proof and the chain · no wallet (25s)
 
-## 1:25 — deliver (45s)
-
-Switch to the **operator browser profile** (already staked). `/app/operator`.
-
-Point at the stake panel: "The operator staked native BOT up front. That stake is what makes
-the order worth funding." Accept the job and show locked go up by the order's max slash.
-
-Paste a good output and submit. Show the `outputHash` appearing under the textarea before you
-submit: "the output is committed before the verifier ever sees it."
-
-## 2:10 — the verdict (55s)
-
-`Run the AI verifier`.
-
-While it runs, say the line that matters most for the AI track:
-
-> "The model isn't answering a question or writing copy. Its signed verdict is the only thing
-> that releases escrow — remove the model and nothing settles. That's what makes this AI-native
-> and not a chatbot bolted onto an app."
-
-When it lands, show three things in order:
-
-1. `PASS` with a score, and the per-rubric findings.
-2. The reason text, in full.
-3. The signed certificate block: signer address, model, digest, signature. Expand the raw
-   typed data for one second.
-
-`Submit verdict on-chain`. Let the transaction confirm and show the outcome flip to PAY.
-
-## 3:05 — the failure case (35s)
-
-This is the part that separates escrow from settlement. Open the pre-settled
-**[order #3](https://metrx.pages.dev/proof/3)** from `/proof` — produced exactly the same way
-you just showed, with a deliberately off-topic output.
-
-Show the verifier's FAIL reasoning naming which rubric items were missed, then the outcome:
-buyer refunded the escrow **plus** the operator's slashed stake.
-
-> "Same contract, same verifier, opposite outcome. Nobody negotiated."
-
-## 3:40 — the proof and the chain (20s)
-
-Open the PAY order (**[#2](https://metrx.pages.dev/proof/2)**) in the no-wallet `/proof` tab.
-Scroll to **Hash checks** and let it sit on screen:
-
-> "Every published artifact is re-hashed and compared to what the contract stored. If anyone
-> swapped the evidence after settlement, this table says MISMATCH."
-
-Close on the BOTScan link for the settlement transaction:
-
-> "The contract is source-verified on BOTScan and settles in native BOT — no token approvals,
-> no bridge. This is a real deployment on BOT Chain Mainnet, not a testnet."
-
-<!-- Optional, only if you want to bank more of the integration score and it stays accurate to
-     ARCHITECTURE.md: "The client uses legacy transactions for BOT Chain's zero base fee and
-     batches reads instead of relying on Multicall3." -->
+**DO:** In the wallet-free `/proof` tab, open **#2** (PAID). Scroll to **Hash checks** and hold on it.
+**SAY:** "Every artifact is re-hashed against what the contract stored. Swap the evidence and this
+says MISMATCH."
+**DO:** Click the BOTScan link for the settlement transaction.
+**SAY:** "Source-verified on BOTScan, settled in native BOT — no approvals, no bridge. Real mainnet."
 
 ---
 
 ## Recording notes
 
-- Record at 1280×800 or wider. The order detail and proof pages use a two-column layout that
-  collapses below ~1000px.
-- Use a real BOT balance. An "insufficient BOT" state on camera undercuts the whole point.
-- Do not cut the transaction confirmations. The waiting is the proof.
-- Keep the wrong-network banner out of the recording by switching to chain 677 first.
-- If the verifier is still in mock mode, say so on camera. The UI already labels it, and
-  getting caught hiding it costs more than admitting it.
-- If a transaction is slow, name it: "that's mainnet finality, not a hang." Composure reads as
-  confidence.
+- 1280×800 or wider. Order/proof pages go two-column above ~1000px.
+- Real BOT balance — an "insufficient BOT" state on camera undercuts everything.
+- Never cut a transaction confirmation. The waiting is the proof.
+- If a tx is slow: "that's mainnet finality, not a hang." Composure reads as confidence.
+- If the verifier is in mock mode, the page labels it — say so. Hiding it costs more than admitting it.
 
-## What a judge should be able to do afterwards
+## What a judge can do afterwards
 
 1. Open `/proof` with no wallet and read both lifecycles.
 2. Click through to BOTScan and see the settlement transactions.
-3. Open the repo, run `pnpm contracts:test` and `pnpm test`, and get 52 and 80 passing.
+3. Clone the repo, run `pnpm contracts:test` and `pnpm test` → 52 and 80 passing.
 4. Run `pnpm claim:verify` and watch every claim re-read from chain.
-5. Paste any proof link (e.g. `/proof/2` or `/proof/3`) into a chat and watch it unfurl with
-   that order's settlement card.
+5. Paste any `/proof/2` or `/proof/3` link into a chat and watch it unfurl with that order's card.
