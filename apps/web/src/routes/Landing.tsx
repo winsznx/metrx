@@ -29,29 +29,43 @@ function Hero() {
     <div className="relative isolate overflow-hidden pb-28 pt-24 md:pb-36 md:pt-32">
       <HeroArtwork />
       <Section>
-        <div className="max-w-3xl">
-          <span className="pill bg-ink text-paper">BOT Chain Mainnet · Chain 677</span>
-          <h1 className="display mt-6 text-[46px] md:text-[76px]">
-            Compute delivery should settle, not depend on trust.
-          </h1>
-          <p className="mt-6 max-w-2xl text-[19px] leading-relaxed text-slate">
-            Metrx lets AI teams fund compute jobs, operators deliver results, and an AI verifier trigger BOT Chain
-            settlement: PAY, REFUND, or SLASH.
-          </p>
+        <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="max-w-3xl">
+            <span className="pill bg-ink text-paper">BOT Chain Mainnet · Chain 677</span>
+            <h1 className="display mt-6 text-[46px] md:text-[76px]">
+              Compute delivery should settle, not depend on trust.
+            </h1>
+            <p className="mt-6 max-w-2xl text-[19px] leading-relaxed text-slate">
+              Metrx lets AI teams fund compute jobs, operators deliver results, and an AI verifier trigger BOT Chain
+              settlement: PAY, REFUND, or SLASH.
+            </p>
 
-          <div className="mt-9 flex flex-wrap items-center gap-3">
-            <Link to="/app" className="btn btn-primary px-7 py-3.5 text-base">
-              Launch app
-            </Link>
-            <Link to="/proof" className="btn btn-ghost px-7 py-3.5 text-base">
-              View live proof
-            </Link>
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              <Link to="/app" className="btn btn-primary px-7 py-3.5 text-base">
+                Launch app
+              </Link>
+              <Link to="/proof" className="btn btn-ghost px-7 py-3.5 text-base">
+                View live proof
+              </Link>
+            </div>
+
+            <div className="mt-10 flex flex-wrap gap-2">
+              {["BOT Chain Mainnet", "Native BOT escrow", "AI-signed verdicts", "PAY / REFUND / SLASH"].map((c) => (
+                <Chip key={c}>{c}</Chip>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-10 flex flex-wrap gap-2">
-            {["BOT Chain Mainnet", "Native BOT escrow", "AI-signed verdicts", "PAY / REFUND / SLASH"].map((c) => (
-              <Chip key={c}>{c}</Chip>
-            ))}
+          <div className="hidden justify-self-center lg:block">
+            <img
+              src="/hero-certificate.webp"
+              alt="A signed Metrx settlement certificate carrying a green verification seal"
+              width={1120}
+              height={1120}
+              loading="eager"
+              decoding="async"
+              className="w-full max-w-[520px]"
+            />
           </div>
         </div>
       </Section>
